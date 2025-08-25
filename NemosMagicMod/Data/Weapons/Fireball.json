@@ -1,0 +1,20 @@
+﻿{
+    "FireballSpellTool": {
+        "Category": -98,
+        "DisplayName": "Fireball",
+        "MinDamage": 0,
+        "MaxDamage": 0,
+        "Speed": 0,
+        "Projectile": [
+            {
+                "Id": "FireballSpell",
+                "Damage": 20,
+                "Velocity": 10,
+                "Explodes": true,
+                "SpriteIndex": 21,
+                "CollisionSound": "fireball",
+                "MaxDistance": 8
+            }
+        ]
+    }
+}

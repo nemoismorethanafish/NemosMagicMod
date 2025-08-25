@@ -1,0 +1,19 @@
+﻿{
+    "Name": "NemosMagicMod",
+    "Author": "Nemoismorethanafish",
+    "Version": "1.0.0",
+    "Description": "One or two sentences about the mod.",
+    "UniqueID": "Nemoismorethanafish.NemosMagicMod",
+    "EntryDll": "NemosMagicMod.dll",
+    "UpdateKeys": [],
+    "Dependencies": [
+        {
+            "UniqueID": "spacechase0.SpaceCore",
+            "IsRequired": true
+        },
+        {
+            "UniqueID": "spacechase0.GenericModConfigMenu",
+            "IsRequired": true
+        }
+    ]
+}
