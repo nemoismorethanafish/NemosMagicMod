@@ -23,7 +23,7 @@ namespace NemosMagicMod.Spells
             if (who.buffs.IsApplied(BuffId))
                 who.buffs.Remove(BuffId);
 
-            Texture2D icon = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
+            Texture2D icon = NemosMagicMod.ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
 
             var buff = new Buff(
                 id: BuffId,
@@ -38,11 +38,6 @@ namespace NemosMagicMod.Spells
             who.buffs.Apply(buff);
             //Game1.showGlobalMessage("You feel lighter on your feet!");
             ModEntry.Instance.Monitor.Log($"Wind Spirit buff applied (+{SpeedIncrease} speed, {DurationMs / 1000}s)", LogLevel.Info);
-        }
-
-        public override bool IsExpired()
-        {
-            return !Game1.player.buffs.IsApplied(BuffId);
         }
     }
 }

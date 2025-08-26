@@ -1,184 +1,109 @@
-﻿using SpaceCore;
+﻿using MagicSkill;
+using SpaceCore;
 using StardewModdingAPI;
-using StardewModdingAPI.Events;
 using StardewValley;
 using System;
-using System.Linq;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
 {
-    internal sealed class ModEntry : Mod
+    public class ModEntry : Mod
     {
-        public static MagicSkill? MagicSkillInstance { get; private set; }
         public static ModEntry Instance { get; private set; } = null!;
 
-        private int previousMagicSkillLevel = -1;
-        private ManaManager? manaManager;
-        private int spellCooldownTicks = 0;
-        private const int SpellCooldownDurationTicks = 20;
+        private ManaBar manaBar = null!;
 
         public override void Entry(IModHelper helper)
         {
             Instance = this;
 
-            // Initialize MagicSkill
-            MagicSkillInstance = new MagicSkill(helper);
+            manaBar = new ManaBar(() => 50, () => 100, 10, 10);
+            manaBar.SubscribeToEvents(helper);
 
-            // Register skill with SpaceCore
-            SpaceCore.Skills.RegisterSkill(MagicSkillInstance);
+            // Load the spellbook icon texture once on mod entry
+            Spellbook.LoadIcon(helper);
 
-            this.Helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
-            this.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            // Register Magic skill (uncommented as requested)
+            SkillRegistrar.Register(new Magic_Skill(), Monitor);
 
-            Monitor.Log("MagicSkill successfully registered!", LogLevel.Info);
+            // Hook SaveLoaded event so we can add the spellbook when a save is loaded
+            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
+            helper.Events.Input.ButtonPressed += OnButtonPressed;
+
+
+            Monitor.Log("Mod loaded!", LogLevel.Info);
         }
 
-        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        // This runs after a save is loaded, player is guaranteed to exist
+        private void OnSaveLoaded(object? sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
         {
-            if (Game1.player == null || MagicSkillInstance == null)
+            var player = Game1.player;
+
+            if (player == null)
             {
-                Monitor.Log("Game1.player or MagicSkillInstance is null, skipping skill level initialization.", LogLevel.Warn);
+                Monitor.Log("Player not found on save loaded, skipping spellbook add.", LogLevel.Warn);
                 return;
             }
 
-            // Ensure skill is registered by checking if it's in SpaceCore's skill list
-            if (SpaceCore.Skills.GetSkill(MagicSkill.MagicSkillId) == null)
+            // Avoid adding duplicates
+            bool hasSpellbook = false;
+            foreach (var item in player.Items)
             {
-                Monitor.Log("MagicSkill not registered, re-registering it now.", LogLevel.Info);
-                SpaceCore.Skills.RegisterSkill(MagicSkillInstance);
+                if (item is Spellbook)
+                {
+                    hasSpellbook = true;
+                    break;
+                }
             }
 
-            // Fetch the skill level once the game is fully loaded
-            previousMagicSkillLevel = SpaceCore.Skills.GetSkillLevel(Game1.player, MagicSkill.MagicSkillId);
-
-            if (previousMagicSkillLevel != -1)
+            if (!hasSpellbook)
             {
-                Monitor.Log($"Previous Magic Skill Level: {previousMagicSkillLevel}", LogLevel.Info);
-
-                // Initialize manaManager only if not already initialized
-                if (manaManager == null)
-                {
-                    manaManager = new ManaManager(Game1.player);
-                    Monitor.Log("Save loaded: manaManager initialized.", LogLevel.Info);
-                }
-
-                // Give the spellbook to the player if they don't already have one
-                bool hasSpellbook = Game1.player?.Items?.Any(item => item is Spellbook) ?? false;
-
-                if (!hasSpellbook)
-                {
-                    Game1.player?.addItemToInventory(new Spellbook());
-                    Monitor.Log("Spellbook added to player inventory.", LogLevel.Info);
-                }
+                player.addItemToInventory(new Spellbook());
+                Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
             else
             {
-                Monitor.Log("Magic skill level not found after save load, skipping initialization.", LogLevel.Warn);
+                Monitor.Log("Player already has a Spellbook, not adding.", LogLevel.Trace);
+            }
+        }
+        private void OnButtonPressed(object? sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
+        {
+            if (!Context.IsPlayerFree) // only allow when player isn't in a cutscene or menu
+                return;
+
+            // Use the number 9 key
+            if (e.Button == SButton.D9)
+            {
+                Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper);
             }
         }
 
-        private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
+    }
+}
+
+public static class SkillRegistrar
+{
+    public static void Register(Skill skill, IMonitor monitor)
+    {
+        Skills.RegisterSkill(skill);
+
+        string queryKey = "PLAYER_" + skill.Id.ToUpper() + "_LEVEL";
+
+        try
         {
-            if (spellCooldownTicks > 0)
-                spellCooldownTicks--;
-        }
-
-        public void CastSpell(Spell spell)
-        {
-            // Early exit if the spell is null
-            if (spell == null)
-                return;
-
-            // Check if manaManager is null before using it
-            if (manaManager == null)
+            GameStateQuery.Register(queryKey, (args, ctx) =>
             {
-                Monitor.Log("Cannot cast spell: manaManager not initialized!", LogLevel.Error);
-                return;
-            }
-
-            // Check for spell cooldown
-            if (spellCooldownTicks > 0)
-            {
-                Monitor.Log("Spell is on cooldown.", LogLevel.Trace);
-                return;
-            }
-
-            // Check if there's enough mana
-            if (!manaManager.UseMana(spell.ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
-
-            // Check if the player is null before attempting animation
-            if (Game1.player == null)
-            {
-                Monitor.Log("Cannot cast spell: player is null!", LogLevel.Error);
-                return;
-            }
-
-            AnimateFarmerCasting(Game1.player);
-            spell.Cast(Game1.player);
-
-            spellCooldownTicks = SpellCooldownDurationTicks;
-
-            Game1.player.startGlowing(Microsoft.Xna.Framework.Color.Cyan, false, 0.1f);
-
-            Monitor.Log($"Spell cast: {spell.GetType().Name}", LogLevel.Info);
-        }
-
-        private void AnimateFarmerCasting(Farmer player)
-        {
-            if (player == null)
-                return;
-
-            player.jitterStrength = 0f;
-
-            player.FarmerSprite.setCurrentSingleFrame(94, 250, false, false);
-            player.FarmerSprite.StopAnimation();
-            player.FarmerSprite.animateOnce(new FarmerSprite.AnimationFrame[] {
-                new FarmerSprite.AnimationFrame(94, 100),
-                new FarmerSprite.AnimationFrame(95, 100),
-                new FarmerSprite.AnimationFrame(96, 100),
+                return GameStateQuery.Helpers.PlayerSkillLevelImpl(args, ctx.Player, f => f.GetCustomSkillLevel(skill));
             });
+
+            monitor.Log($"GameStateQuery '{queryKey}' registered.", LogLevel.Info);
         }
+        catch (InvalidOperationException)
+        {
+            monitor.Log($"GameStateQuery '{queryKey}' already registered, skipping.", LogLevel.Trace);
+        }
+
+        monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
     }
 
-    public class MagicSkill : Skill
-    {
-        public const string MagicSkillId = "NemosMagicMod.MagicSkill";
-
-        public MagicSkill(IModHelper helper) : base(MagicSkillId) { }
-
-        public override string GetName() => "Magic";
-
-        public int GetVanillaSkillIndex()
-        {
-            return 8; // Example index
-        }
-    }
-
-    public class ManaManager
-    {
-        private Farmer player;
-        public int CurrentMana { get; private set; } = 100;
-        public int MaxMana { get; private set; } = 100;
-
-        public ManaManager(Farmer player)
-        {
-            this.player = player;
-        }
-
-        // Method to use mana
-        public bool UseMana(int amount)
-        {
-            if (CurrentMana >= amount)
-            {
-                CurrentMana -= amount;
-                return true;
-            }
-            return false;
-        }
-    }
 }

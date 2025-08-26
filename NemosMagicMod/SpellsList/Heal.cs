@@ -30,10 +30,5 @@ namespace NemosMagicMod.Spells
         {
             // Heal is instant, so no ongoing effects
         }
-
-        public override bool IsExpired()
-        {
-            return true; // expires instantly
-        }
     }
 }

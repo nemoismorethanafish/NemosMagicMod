@@ -47,7 +47,10 @@ namespace NemosMagicMod
             {
                 // Clear old sprites as needed, then cast
                 // Example:
-                ModEntry.Instance.CastSpell(SpellRegistry.SelectedSpell);
+                if (SpellRegistry.SelectedSpell != null && Game1.player != null)
+                {
+                    SpellRegistry.SelectedSpell.Cast(Game1.player);
+                }
             }
 
             return false; // prevent animation

@@ -1,52 +1,40 @@
-﻿using MagicSkillDefinition;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using StardewValley;
-using StardewValley.Monsters; // if needed
-using StardewValley.Objects; // if needed for sprites
-using System.Collections.Generic;
 
-public class Spell
+namespace NemosMagicMod.Spells
 {
-    public string Name { get; }
-    public int ManaCost { get; }
-    public string Description { get; }
-    public int ExperienceReward { get; }
-
-    public Spell(string name, int manaCost, string description, int experienceReward = 10)
+    public abstract class Spell
     {
-        Name = name;
-        ManaCost = manaCost;
-        Description = description;
-        ExperienceReward = experienceReward;
-    }
+        public string Name { get; }
+        public int SkillLevelRequired { get; }
+        public string Description { get; }
+        public int ManaCost { get; }
 
-    public virtual bool IsExpired()
-    {
-        return false;
-    }
-
-    public virtual void Update(GameTime gameTime, Farmer who)
-    {
-        // Default no-op
-    }
-
-    public virtual void Cast(Farmer caster)
-    {
-        // Default cast logic (messages, effects, etc.)
-
-        // Grant XP to Magic skill if available
-        if (caster != null && NemosMagicMod.ModEntry.MagicSkillInstance != null)
+        // Constructor
+        public Spell(string name, int skillLevelRequired, string description, int manaCost)
         {
-            SpaceCore.Skills.AddExperience(caster, MagicSkill.MagicSkillId, ExperienceReward);
-            NemosMagicMod.ModEntry.Instance.Monitor.Log(
-                $"Granted {ExperienceReward} XP to Magic skill for casting {Name}.",
-                StardewModdingAPI.LogLevel.Info);
+            Name = name;
+            SkillLevelRequired = skillLevelRequired;
+            Description = description;
+            ManaCost = manaCost;
         }
-    }
 
-    public virtual List<TemporaryAnimatedSprite> CastWithSprites(Farmer caster)
-    {
-        Cast(caster);
-        return new List<TemporaryAnimatedSprite>();
+        // Cast the spell (override this for actual functionality)
+        public virtual void Cast(Farmer who)
+        {
+            // Basic cast logic
+        }
+
+        // The Update method can be overridden for spells that need updates each frame
+        public virtual void Update(GameTime gameTime, Farmer who)
+        {
+            // Default implementation: no behavior
+        }
+
+        // The IsExpired method (for spells with duration)
+        public virtual bool IsExpired()
+        {
+            return false; // Default: not expired
+        }
     }
 }

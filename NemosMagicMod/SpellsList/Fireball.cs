@@ -17,7 +17,7 @@ namespace NemosMagicMod.Spells
             base.Cast(who);
 
             //Game1.showGlobalMessage("You hurl a fireball!");
-            ModEntry.Instance.Monitor.Log("Fireball cast via spellbook!", LogLevel.Info);
+            NemosMagicMod.ModEntry.Instance.Monitor.Log("Fireball cast via spellbook!", LogLevel.Info);
 
             // Get mouse cursor world position
             Vector2 cursorScreenPos = new Vector2(Game1.getMouseX(), Game1.getMouseY());

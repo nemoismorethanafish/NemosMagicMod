@@ -1,5 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using NemosMagicMod;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 using System;
@@ -23,7 +25,7 @@ internal class ManaBar
         this.Y = y;
     }
 
-    public void Draw(SpriteBatch spriteBatch)
+    public void DrawManaBar(SpriteBatch spriteBatch)
     {
         float percent = (float)getCurrentMana() / getMaxMana();
 
@@ -63,5 +65,15 @@ internal class ManaBar
             IClickableMenu.drawHoverText(
                 spriteBatch, tooltip, Game1.smallFont);
         }
+    }
+    public void OnRenderingHud(object? sender, StardewModdingAPI.Events.RenderingHudEventArgs e)
+    {
+        ModEntry.Instance.Monitor.Log("Drawing mana bar...", LogLevel.Trace);
+        DrawManaBar(Game1.spriteBatch);
+    }
+
+    public void SubscribeToEvents(IModHelper helper)
+    {
+        helper.Events.Display.RenderingHud += OnRenderingHud;
     }
 }
