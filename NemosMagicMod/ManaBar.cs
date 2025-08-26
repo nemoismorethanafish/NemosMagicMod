@@ -2,11 +2,9 @@
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using StardewModdingAPI;
-using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
 using System;
-using System.Threading;
 
 internal class ManaBar
 {
@@ -78,21 +76,6 @@ internal class ManaBar
     {
         helper.Events.Display.RenderingHud += OnRenderingHud;
         helper.Events.GameLoop.DayStarted += (_, _) => ManaManager.Refill();
-        helper.Events.Input.ButtonPressed += OnButtonPressed;
 
-
-    }
-
-    private void OnButtonPressed(object sender, ButtonPressedEventArgs e)
-    {
-        // Only listen for keyboard input and only if player is loaded
-        if (!Context.IsPlayerFree || e.Button != SButton.D8)
-            return;
-
-        // Refill mana for testing
-        ManaManager.Refill();
-
-        Game1.showGlobalMessage("Mana refilled (testing)!");
-        ModEntry.Instance.Monitor.Log("Mana refilled via keypress (8)", LogLevel.Info);
     }
 }

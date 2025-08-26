@@ -7,13 +7,7 @@ namespace NemosMagicMod.Spells
     {
         private const int HealAmount = 40;
 
-        public Heal()
-            : base(
-                name: "Heal",
-                description: "Restores some health.",
-                manaCost: 5,
-                experienceGained: 100,
-                skillId: "nemosmagicmod.Magic") // 👈 Pass your actual SpaceCore skill ID
+        public Heal() : base("Heal", 5, "Restores some health.", 100)
         {
         }
 
