@@ -75,5 +75,7 @@ internal class ManaBar
     public void SubscribeToEvents(IModHelper helper)
     {
         helper.Events.Display.RenderingHud += OnRenderingHud;
+        helper.Events.GameLoop.DayStarted += (_, _) => ManaManager.Refill();
+
     }
 }

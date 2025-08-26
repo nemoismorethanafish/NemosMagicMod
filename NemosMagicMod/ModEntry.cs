@@ -1,4 +1,5 @@
 ﻿using MagicSkill;
+using Microsoft.Xna.Framework.Graphics;
 using SpaceCore;
 using StardewModdingAPI;
 using StardewValley;
@@ -13,15 +14,28 @@ namespace NemosMagicMod
 
         private ManaBar manaBar = null!;
 
+        public static Texture2D MagicSkillIcon { get; private set; } = null!;
+
+
         public override void Entry(IModHelper helper)
         {
             Instance = this;
 
-            manaBar = new ManaBar(() => 50, () => 100, 10, 10);
+            ManaManager.SetMaxMana(100);
+            ManaManager.Refill();
+
+            manaBar = new ManaBar(
+                () => ManaManager.CurrentMana,
+                () => ManaManager.MaxMana,
+                10,
+                10);
+
             manaBar.SubscribeToEvents(helper);
 
             // Load the spellbook icon texture once on mod entry
             Spellbook.LoadIcon(helper);
+            MagicSkillIcon = Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
+
 
             // Register Magic skill (uncommented as requested)
             SkillRegistrar.Register(new Magic_Skill(), Monitor);

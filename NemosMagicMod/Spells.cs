@@ -22,7 +22,13 @@ namespace NemosMagicMod.Spells
         // Cast the spell (override this for actual functionality)
         public virtual void Cast(Farmer who)
         {
-            // Basic cast logic
+            if (!ManaManager.HasEnoughMana(ManaCost))
+            {
+                Game1.showRedMessage("Not enough mana!");
+                return;
+            }
+
+            ManaManager.SpendMana(ManaCost);
         }
 
         // The Update method can be overridden for spells that need updates each frame
