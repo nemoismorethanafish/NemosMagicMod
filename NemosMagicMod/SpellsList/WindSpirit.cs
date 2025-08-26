@@ -1,6 +1,5 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
-using StardewModdingAPI;
 using StardewValley.Buffs;
 
 namespace NemosMagicMod.Spells
@@ -8,18 +7,28 @@ namespace NemosMagicMod.Spells
     public class WindSpirit : Spell
     {
         private const string BuffId = "NemosMagicMod_WindSpirit";
-        private const float SpeedIncrease = 1; //This will be divided by four later
-        private const int DurationMs = 60_000; // 60 seconds
+        private const float SpeedIncrease = 1f;
+        private const int DurationMs = 60_000;
 
-        public WindSpirit() : base("Wind Spirit", 50, "Temporarily increases your movement speed.", 10)
+        public WindSpirit()
+            : base(
+                name: "Wind Spirit",
+                description: "Temporarily increases your movement speed.",
+                manaCost: 10,
+                experienceGained: 5,
+                skillId: "nemosmagicmod.Magic") // <-- Use your actual registered ID here
         {
         }
+
 
         public override void Cast(Farmer who)
         {
             base.Cast(who);
 
-            // Remove existing buff with the same ID to replace it
+            // If mana was insufficient, base.Cast() will return early
+            if (!ManaManager.HasEnoughMana(ManaCost))
+                return;
+
             if (who.buffs.IsApplied(BuffId))
                 who.buffs.Remove(BuffId);
 
@@ -36,8 +45,7 @@ namespace NemosMagicMod.Spells
             );
 
             who.buffs.Apply(buff);
-            //Game1.showGlobalMessage("You feel lighter on your feet!");
-            ModEntry.Instance.Monitor.Log($"Wind Spirit buff applied (+{SpeedIncrease} speed, {DurationMs / 1000}s)", LogLevel.Info);
+            ModEntry.Instance.Monitor.Log($"Wind Spirit buff applied (+{SpeedIncrease} speed, {DurationMs / 1000}s)", StardewModdingAPI.LogLevel.Info);
         }
     }
 }
