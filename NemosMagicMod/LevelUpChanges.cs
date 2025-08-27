@@ -36,6 +36,19 @@ namespace NemosMagicMod
 
                 checkedUnlock = true; // Only do this once
             }
+
+            if (ModEntry.MagicLevel >= 3)
+            {
+                var spell = SpellRegistry.TreeSpirit;
+
+                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
+                        {
+                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
+                    Monitor.Log("{ spell.Name} spell unlocked at MagicLevel { ModEntry.MagicLevel}!", LogLevel.Info);
+                }
+
+                checkedUnlock = true;
+            }
         }
 
     }

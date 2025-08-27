@@ -4,10 +4,14 @@ using System.Collections.Generic;
 
 public static class SpellRegistry //List of all spells
 {
+    public static Spell SelectedSpell = WindSpirit;
+
     public static Spell WindSpirit = new WindSpirit();
     public static Spell Heal = new Heal();
     public static Spell Fireball = new Fireball();
     public static Spell WaterSpirit = new WaterSpirit();
+    public static TreeSpirit TreeSpirit { get; } = new TreeSpirit();
+
 
 
     // Add this list so the menu can render all spells
@@ -16,10 +20,12 @@ public static class SpellRegistry //List of all spells
         WindSpirit,
         Heal,
         Fireball,
-        WaterSpirit
+        WaterSpirit,
+        TreeSpirit
     };
 
-    public static Spell SelectedSpell = WindSpirit;
+
+
 
     public static class PlayerData
     {
