@@ -5,7 +5,7 @@ using StardewValley;
 using System.Collections.Generic;
 using StardewModdingAPI;
 
-// Make sure this matches your SpellRegistry namespace!
+// Namespace should match your mod structure
 using NemosMagicMod.Spells;
 
 public class SpellSelectionMenu : IClickableMenu
@@ -15,9 +15,11 @@ public class SpellSelectionMenu : IClickableMenu
     private readonly IModHelper helper;
 
     public SpellSelectionMenu(IModHelper helper)
-        : base(Game1.uiViewport.Width / 2 - 200, Game1.uiViewport.Height / 2 - 150, 400, 300, true)
+        : base(Game1.uiViewport.Width / 2 - 300, Game1.uiViewport.Height / 2 - 225, 600, 450, true)
     {
+        this.helper = helper;
         this.spells = new List<Spell>();
+
         foreach (var spell in SpellRegistry.Spells)
         {
             if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
@@ -25,8 +27,6 @@ public class SpellSelectionMenu : IClickableMenu
                 this.spells.Add(spell);
             }
         }
-
-        this.helper = helper;
     }
 
     public override void draw(SpriteBatch b)
@@ -38,16 +38,49 @@ public class SpellSelectionMenu : IClickableMenu
         SpriteFont font = Game1.dialogueFont;
         string title = "Select a Spell";
         Vector2 titleSize = font.MeasureString(title);
-        b.DrawString(font, title, new Vector2(xPositionOnScreen + width / 2 - titleSize.X / 2, yPositionOnScreen + 10), Color.Black);
+        b.DrawString(font, title, new Vector2(xPositionOnScreen + width / 2 - titleSize.X / 2, yPositionOnScreen + 15), Color.Black);
+
+        // Get mouse position
+        int mouseX = Game1.getMouseX();
+        int mouseY = Game1.getMouseY();
 
         // Draw spell list
         for (int i = 0; i < spells.Count; i++)
         {
-            Color textColor = i == selectedSpellIndex ? Color.Yellow : Color.Black;
-            string spellName = spells[i].Name;
-            b.DrawString(font, spellName, new Vector2(xPositionOnScreen + 20, yPositionOnScreen + 50 + i * 30), textColor);
+            Vector2 pos = new Vector2(xPositionOnScreen + 30, yPositionOnScreen + 60 + i * 40);
+            Rectangle spellRect = new Rectangle((int)pos.X - 10, (int)pos.Y - 5, width - 60, 35);
+
+            bool isHovered = spellRect.Contains(mouseX, mouseY);
+            bool isSelected = i == selectedSpellIndex;
+
+            // Simplified background highlight
+            if (isSelected)
+            {
+                b.Draw(Game1.staminaRect, spellRect, Color.Gold * 0.3f);
+            }
+            else if (isHovered)
+            {
+                b.Draw(Game1.staminaRect, spellRect, Color.Black * 0.1f);
+            }
+
+            // Draw spell name
+            Color textColor = isSelected ? Color.DarkGoldenrod : Color.Black;
+            b.DrawString(Game1.smallFont, spells[i].Name, pos, textColor);
         }
 
+        // Draw hover tooltip for the hovered spell
+        for (int i = 0; i < spells.Count; i++)
+        {
+            Rectangle spellRect = new Rectangle(xPositionOnScreen + 20, yPositionOnScreen + 60 + i * 40 - 5, width - 40, 35);
+            if (spellRect.Contains(mouseX, mouseY))
+            {
+                string tooltip = $"{spells[i].Description}\nMana Cost: {spells[i].ManaCost}";
+                IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
+                break;
+            }
+        }
+
+        // Draw cursor
         base.drawMouse(b);
     }
 
@@ -55,13 +88,12 @@ public class SpellSelectionMenu : IClickableMenu
     {
         for (int i = 0; i < spells.Count; i++)
         {
-            Rectangle spellRect = new Rectangle(xPositionOnScreen + 20, yPositionOnScreen + 50 + i * 30 - 5, 200, 30);
+            Rectangle spellRect = new Rectangle(xPositionOnScreen + 30, yPositionOnScreen + 60 + i * 40 - 5, width - 60, 35);
             if (spellRect.Contains(x, y))
             {
                 selectedSpellIndex = i;
                 Game1.playSound("smallSelect");
 
-                // ✅ Prepare the spell instead of casting
                 SpellRegistry.SelectedSpell = spells[selectedSpellIndex];
                 Game1.addHUDMessage(new HUDMessage($"Prepared {spells[selectedSpellIndex].Name}", HUDMessage.newQuest_type));
 
@@ -71,8 +103,6 @@ public class SpellSelectionMenu : IClickableMenu
         }
     }
 
-
-    // Optional: allow arrow keys to navigate list
     public override void receiveKeyPress(Microsoft.Xna.Framework.Input.Keys key)
     {
         if (key == Microsoft.Xna.Framework.Input.Keys.Up)

@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
-    <LangVersion>10.0</LangVersion>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+		<PropertyGroup>
+			<TargetFramework>net6.0</TargetFramework>
+			<LangVersion>latest</LangVersion>
+			<Nullable>enable</Nullable>
+		</PropertyGroup>
 
   <ItemGroup>
     <None Remove="Assets\magic-icon.png" />
