@@ -1,11 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
-using StardewValley;
 using StardewModdingAPI.Events;
+using StardewValley;
 using System;
+using static Spell;
 
-public class TreeSpirit : Spell
+public class TreeSpirit : Spell, IRenderable
 {
     private Texture2D axeTexture;
     private float activeTimer = 0f;
@@ -15,12 +16,14 @@ public class TreeSpirit : Spell
     public bool IsActive => activeTimer > 0f;
 
     public TreeSpirit()
-        : base("tree_spirit", "Tree Spirit", "Summons a spirit in the form of an axe.", 20, 50)
+        : base("tree_spirit", "Tree Spirit",
+              "Summons a spirit in the form of an axe.",
+              20, 50)
     { }
 
     public override void Cast(Farmer who)
     {
-        base.Cast(who);
+        base.Cast(who); // base Cast now handles disabling other spells
 
         try
         {
@@ -33,7 +36,6 @@ public class TreeSpirit : Spell
 
         activeTimer = duration;
 
-        // Hook drawing once
         if (!subscribed)
         {
             ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
@@ -47,9 +49,12 @@ public class TreeSpirit : Spell
     {
         if (activeTimer > 0f)
             activeTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
-        else if (subscribed)
+    }
+
+    public void Unsubscribe()
+    {
+        if (subscribed)
         {
-            // Unsubscribe when timer ends
             ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
             subscribed = false;
         }
@@ -62,7 +67,6 @@ public class TreeSpirit : Spell
 
         SpriteBatch spriteBatch = e.SpriteBatch;
 
-        // Floating animation
         float floatAmplitude = 10f;
         float floatSpeed = 2f;
         float bobbing = floatAmplitude * (float)Math.Sin(Game1.currentGameTime.TotalGameTime.TotalSeconds * floatSpeed);
@@ -70,7 +74,6 @@ public class TreeSpirit : Spell
         float baseOffset = 48f;
         float scale = 2f;
 
-        // Position above player
         Vector2 worldPos = Game1.player.Position + new Vector2(0, -(baseOffset * scale + bobbing));
         Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, worldPos);
 
@@ -83,7 +86,7 @@ public class TreeSpirit : Spell
             new Vector2(axeTexture.Width / 2, axeTexture.Height / 2),
             scale,
             SpriteEffects.None,
-            1f // render on top
+            1f
         );
     }
 }

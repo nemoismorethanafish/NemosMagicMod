@@ -32,6 +32,20 @@ public abstract class Spell
 
     public virtual void Cast(Farmer who)
     {
+        // Disable any active spells first
+        foreach (var spell in ModEntry.ActiveSpells)
+        {
+            spell.IsActive = false;
+
+            // If the spell has a RenderedWorld hook or sprites, unsubscribe events
+            if (spell is IRenderable r)
+                r.Unsubscribe();
+        }
+
+        // Clear the list of active spells
+        ModEntry.ActiveSpells.Clear();
+
+        // Check mana
         if (!ManaManager.HasEnoughMana(ManaCost))
         {
             Game1.showRedMessage("Not enough mana!");
@@ -40,7 +54,12 @@ public abstract class Spell
 
         ManaManager.SpendMana(ManaCost);
         GrantExperience(who);
+
+        // Add this spell to active spells
+        IsActive = true;
+        ModEntry.RegisterActiveSpell(this);
     }
+
 
     protected virtual void GrantExperience(Farmer who)
     {
@@ -50,4 +69,9 @@ public abstract class Spell
     }
 
     public virtual void Update(GameTime gameTime, Farmer who) { }
+
+    public interface IRenderable
+    {
+        void Unsubscribe();
+    }
 }
