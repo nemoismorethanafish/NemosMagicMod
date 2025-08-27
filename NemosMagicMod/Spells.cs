@@ -13,15 +13,19 @@ public abstract class Spell
     public string Name { get; }
     public string Description { get; }
     public int ManaCost { get; }
+
     public readonly int ExperienceGained;
 
-    public Spell(string id, string name, string description, int manaCost, int experienceGained = 25)
+    public bool IsActive { get; set; }
+
+    public Spell(string id, string name, string description, int manaCost, int experienceGained = 25, bool isActive = false)
     {
         Id = id;
         Name = name;
         Description = description;
         ManaCost = manaCost;
         ExperienceGained = experienceGained;
+        IsActive = isActive;
     }
 
     public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this);

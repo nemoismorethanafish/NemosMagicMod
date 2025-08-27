@@ -7,6 +7,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
@@ -15,6 +16,7 @@ namespace NemosMagicMod
     {
         void RegisterSerializerType(Type type);
     }
+
     public class ModEntry : Mod
     {
         private ISpaceCoreApi? spaceCoreApi;
@@ -28,6 +30,8 @@ namespace NemosMagicMod
 
         public static PlayerSaveData SaveData = new();
 
+        // === Active Spell Tracking ===
+        private static readonly List<Spell> ActiveSpells = new();
 
         public override void Entry(IModHelper helper)
         {
@@ -56,6 +60,8 @@ namespace NemosMagicMod
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.Saving += OnSaving;
 
+            // Hook update loop for active spells
+            helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
@@ -97,9 +103,9 @@ namespace NemosMagicMod
 
             // Schedule UpdateMagicLevel to run on next tick to ensure SpaceCore is ready
             Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
-
         }
-        private void OnSaving(object? sender, StardewModdingAPI.Events.SavingEventArgs e)
+
+        private void OnSaving(object? sender, SavingEventArgs e)
         {
             Helper.Data.WriteSaveData("player-save-data", SaveData);
         }
@@ -108,7 +114,6 @@ namespace NemosMagicMod
         {
             // Unsubscribe immediately so it only runs once
             Helper.Events.GameLoop.UpdateTicked -= RunUpdateMagicLevelOnce;
-
             UpdateMagicLevel();
         }
 
@@ -136,7 +141,6 @@ namespace NemosMagicMod
             }
         }
 
-
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
             if (!Context.IsPlayerFree)
@@ -146,6 +150,28 @@ namespace NemosMagicMod
             {
                 Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper, this.Monitor);
             }
+        }
+
+        // === Active Spell Management ===
+        private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
+        {
+            if (!Context.IsWorldReady)
+                return;
+
+            for (int i = ActiveSpells.Count - 1; i >= 0; i--)
+            {
+                Spell spell = ActiveSpells[i];
+                spell.Update(Game1.currentGameTime, Game1.player);
+
+                if (!spell.IsActive)
+                    ActiveSpells.RemoveAt(i);
+            }
+        }
+
+        public static void RegisterActiveSpell(Spell spell)
+        {
+            ActiveSpells.Add(spell);
+            Instance.Monitor.Log($"Registered active spell: {spell.Name}", LogLevel.Trace);
         }
     }
 

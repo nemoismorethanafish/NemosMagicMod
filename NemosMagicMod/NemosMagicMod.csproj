@@ -1,31 +1,53 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>net48</TargetFramework>
+		<TargetFramework>net6.0</TargetFramework>
+		<PlatformTarget>x64</PlatformTarget>
 		<LangVersion>latest</LangVersion>
-		<Nullable>enable</Nullable>
+
+		<!-- set your Stardew Valley install path here -->
+		<GamePath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley</GamePath>
+		<ModsPath>$(GamePath)\Mods</ModsPath>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<!-- SMAPI build helper -->
+		<PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Core Stardew/SMAPI references -->
+		<Reference Include="Stardew Valley">
+			<HintPath>$(GamePath)\Stardew Valley.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="StardewModdingAPI">
+			<HintPath>$(GamePath)\StardewModdingAPI.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="MonoGame.Framework">
+			<HintPath>$(GamePath)\MonoGame.Framework.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+
+		<!-- SpaceCore + SpaceShared (mod dependencies) -->
+		<Reference Include="SpaceCore">
+			<HintPath>$(ModsPath)\SpaceCore\SpaceCore.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="SpaceShared">
+			<HintPath>$(ModsPath)\SpaceCore\SpaceShared.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Your mod assets -->
 		<None Remove="Assets\magic-icon.png" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="Microsoft.CSharp" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<Content Include="Assets\magic-icon.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-	</ItemGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
-
-		<Reference Include="System.Xml" />
-
-		<Reference Include="SpaceCore">
-			<HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods\SpaceCore\SpaceCore.dll</HintPath>
-		</Reference>
+		<Content Include="Assets\raincloud.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 </Project>
