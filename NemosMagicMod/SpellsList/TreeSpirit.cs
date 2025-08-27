@@ -23,6 +23,12 @@ public class TreeSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
+        if (!ManaManager.HasEnoughMana(ManaCost))
+        {
+            Game1.showRedMessage("Not enough mana!");
+            return;
+        }
+
         base.Cast(who); // base Cast now handles disabling other spells
 
         try

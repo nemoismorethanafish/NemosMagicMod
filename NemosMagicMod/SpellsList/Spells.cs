@@ -1,22 +1,28 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using SpaceCore;
 using StardewValley;
+using StardewModdingAPI.Events;
 using static SpellRegistry;
 
 public abstract class Spell
 {
-    public const string SkillID = ModEntry.SkillID; // or just a fixed int for your skill
+    public const string SkillID = ModEntry.SkillID;
 
-    // Other properties
     public string Id { get; }
     public string Name { get; }
     public string Description { get; }
     public int ManaCost { get; }
 
     public readonly int ExperienceGained;
-
     public bool IsActive { get; set; }
+
+    // Spellbook animation
+    private const float SpellbookDuration = 0.5f; // seconds
+    private float spellbookTimer = 0f;
+    private Texture2D spellbookTexture;
+    private bool subscribedDraw = false;
 
     public Spell(string id, string name, string description, int manaCost, int experienceGained = 25, bool isActive = false)
     {
@@ -26,25 +32,14 @@ public abstract class Spell
         ManaCost = manaCost;
         ExperienceGained = experienceGained;
         IsActive = isActive;
+
+        spellbookTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
     }
 
     public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this);
 
     public virtual void Cast(Farmer who)
     {
-        // Disable any active spells first
-        foreach (var spell in ModEntry.ActiveSpells)
-        {
-            spell.IsActive = false;
-
-            // If the spell has a RenderedWorld hook or sprites, unsubscribe events
-            if (spell is IRenderable r)
-                r.Unsubscribe();
-        }
-
-        // Clear the list of active spells
-        ModEntry.ActiveSpells.Clear();
-
         // Check mana
         if (!ManaManager.HasEnoughMana(ManaCost))
         {
@@ -52,20 +47,103 @@ public abstract class Spell
             return;
         }
 
+        // Disable other active spells
+        foreach (var spell in ModEntry.ActiveSpells)
+        {
+            spell.IsActive = false;
+            if (spell is IRenderable r)
+                r.Unsubscribe();
+        }
+        ModEntry.ActiveSpells.Clear();
+
         ManaManager.SpendMana(ManaCost);
         GrantExperience(who);
 
-        // Add this spell to active spells
+        // Activate spell
         IsActive = true;
         ModEntry.RegisterActiveSpell(this);
+
+        // Start spellbook animation
+        spellbookTimer = SpellbookDuration;
+
+        // Stop movement during casting
+        who.canMove = false;
+
+        // Subscribe to rendering & update events
+        SubscribeDraw();
+
+        // Play casting sound
+        Game1.playSound("wand");
     }
 
+    private void SubscribeDraw()
+    {
+        if (!subscribedDraw)
+        {
+            ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+            ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            subscribedDraw = true;
+        }
+    }
+
+    private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
+    {
+        if (spellbookTimer > 0f)
+        {
+            spellbookTimer -= 1f / 60f; // assuming 60 FPS
+        }
+        else
+        {
+            EndSpellbookAnimation();
+        }
+    }
+
+    private void EndSpellbookAnimation()
+    {
+        ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
+        ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
+        subscribedDraw = false;
+
+        // Restore movement
+        Game1.player.canMove = true;
+    }
+
+    private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
+    {
+        if (spellbookTimer <= 0f) return;
+
+        Farmer who = Game1.player;
+
+        // Base position above farmer
+        Vector2 position = who.Position + new Vector2(0, -who.Sprite.SpriteHeight / 2);
+
+        // Adjust position slightly based on facing direction
+        switch (who.FacingDirection)
+        {
+            case 0: position += new Vector2(0, -10); break; // up
+            case 1: position += new Vector2(10, -5); break; // right
+            case 2: position += new Vector2(0, 0); break;   // down
+            case 3: position += new Vector2(-10, -5); break;// left
+        }
+
+        // Draw the spellbook (slightly larger)
+        e.SpriteBatch.Draw(
+            spellbookTexture,
+            Game1.GlobalToLocal(Game1.viewport, position),
+            null,
+            Color.White,
+            0f,
+            new Vector2(spellbookTexture.Width / 2, spellbookTexture.Height / 2),
+            3f, // increased scale
+            SpriteEffects.None,
+            1f
+        );
+    }
 
     protected virtual void GrantExperience(Farmer who)
     {
         string readableName = Skills.GetSkill(ModEntry.SkillID)?.GetName() ?? "Skill";
         Skills.AddExperience(who, ModEntry.SkillID, ExperienceGained);
-        //Game1.showGlobalMessage($"{who.Name} gained {ExperienceGained} {readableName} experience!");
     }
 
     public virtual void Update(GameTime gameTime, Farmer who) { }

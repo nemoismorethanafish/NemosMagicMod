@@ -20,6 +20,15 @@ public class WaterSpirit : Spell, IRenderable
     private float wateringTimer = 0f;
     private readonly float wateringInterval = 1f;
 
+    public void Unsubscribe()
+    {
+        if (!subscribed) return;
+
+        ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
+        ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
+        subscribed = false;
+    }
+
     private class WaterSplash
     {
         public Vector2 Position;
@@ -48,8 +57,18 @@ public class WaterSpirit : Spell, IRenderable
         }
     }
 
+    private Vector2 cloudPosition; // current world position of the cloud
+    private Vector2 cloudVelocity; // movement per second
+    private readonly float cloudSpeed = 64f; // pixels per second
+
     public override void Cast(Farmer who)
     {
+        if (!ManaManager.HasEnoughMana(ManaCost))
+        {
+            Game1.showRedMessage("Not enough mana!");
+            return;
+        }
+
         base.Cast(who);
 
         // Clear other active spells
@@ -66,6 +85,19 @@ public class WaterSpirit : Spell, IRenderable
         wateringTimer = 0f;
         activeSplashes.Clear();
 
+        // Initialize cloud position above the player
+        cloudPosition = who.Position + new Vector2(0, -64f);
+
+        // Determine velocity based on player's facing direction
+        switch (who.FacingDirection)
+        {
+            case 0: cloudVelocity = new Vector2(0, -cloudSpeed); break; // up
+            case 1: cloudVelocity = new Vector2(cloudSpeed, 0); break;   // right
+            case 2: cloudVelocity = new Vector2(0, cloudSpeed); break;   // down
+            case 3: cloudVelocity = new Vector2(-cloudSpeed, 0); break;  // left
+            default: cloudVelocity = new Vector2(0, 0); break;
+        }
+
         if (!subscribed)
         {
             ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
@@ -73,7 +105,7 @@ public class WaterSpirit : Spell, IRenderable
             subscribed = true;
         }
 
-        Game1.playSound("rain");
+        Game1.playSound("wateringCan");
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -86,6 +118,9 @@ public class WaterSpirit : Spell, IRenderable
 
         float deltaSeconds = 1f / 60f;
         spellTimer += deltaSeconds;
+
+        // Move cloud
+        cloudPosition += cloudVelocity * deltaSeconds;
 
         // Water crops every interval
         wateringTimer += deltaSeconds;
@@ -115,14 +150,18 @@ public class WaterSpirit : Spell, IRenderable
     {
         if (Game1.currentLocation == null) return;
 
-        Vector2 playerTile = Game1.player.Tile;
-        int radius = 2;
+        // Convert cloud position to tile coordinates (integers!)
+        int cloudTileX = (int)Math.Floor(cloudPosition.X / Game1.tileSize);
+        int cloudTileY = (int)Math.Floor(cloudPosition.Y / Game1.tileSize);
+        Vector2 cloudTile = new Vector2(cloudTileX, cloudTileY);
+
+        int radius = 1;
 
         for (int x = -radius; x <= radius; x++)
         {
             for (int y = -radius; y <= radius; y++)
             {
-                Vector2 tile = playerTile + new Vector2(x, y);
+                Vector2 tile = cloudTile + new Vector2(x, y);
                 if (Game1.currentLocation.terrainFeatures.TryGetValue(tile, out var feature)
                     && feature is StardewValley.TerrainFeatures.HoeDirt dirt)
                 {
@@ -131,37 +170,20 @@ public class WaterSpirit : Spell, IRenderable
                     // Add splash
                     Vector2 splashPos = tile * Game1.tileSize + new Vector2(Game1.tileSize / 2, Game1.tileSize / 2);
                     activeSplashes.Add(new WaterSplash(splashPos, splashDuration));
+
+                    Game1.playSound("wateringCan");
                 }
             }
         }
     }
 
-    public void Unsubscribe()
-    {
-        if (!subscribed) return;
-
-        ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
-        ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
-        subscribed = false;
-    }
-
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
-        if (!IsActive || Game1.player == null) return;
-
+        if (!IsActive) return;
         SpriteBatch spriteBatch = e.SpriteBatch;
 
-        // Floating cloud animation
-        float floatAmplitude = 10f;
-        float floatSpeed = 2f;
-        float bobbing = floatAmplitude * (float)Math.Sin(Game1.currentGameTime.TotalGameTime.TotalSeconds * floatSpeed);
-
-        float baseOffset = 48f;
-        float scale = 2f;
-
-        Vector2 worldPos = Game1.player.Position + new Vector2(0, -(baseOffset * scale + bobbing));
-        Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, worldPos);
-
+        // Draw cloud at current position
+        Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, cloudPosition);
         spriteBatch.Draw(
             cloudTexture,
             screenPos,
@@ -169,7 +191,7 @@ public class WaterSpirit : Spell, IRenderable
             Color.White,
             0f,
             new Vector2(cloudTexture.Width / 2, cloudTexture.Height / 2),
-            scale,
+            2f,
             SpriteEffects.None,
             1f
         );
@@ -180,11 +202,11 @@ public class WaterSpirit : Spell, IRenderable
             spriteBatch.Draw(
                 splashTexture,
                 Game1.GlobalToLocal(Game1.viewport, splash.Position),
-                null, // use the entire texture
+                null,
                 Color.White,
                 0f,
-                new Vector2(splashTexture.Width / 2, splashTexture.Height / 2), // center
-                Game1.pixelZoom * 0.25f, // scale down to 1/4
+                new Vector2(splashTexture.Width / 2, splashTexture.Height / 2),
+                Game1.pixelZoom * 0.25f,
                 SpriteEffects.None,
                 1f
             );

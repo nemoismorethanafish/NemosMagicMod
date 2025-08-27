@@ -1,44 +1,56 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using StardewValley.Menus;
-using StardewValley;
-using System.Collections.Generic;
+﻿using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
+using StardewValley;
+using StardewValley.Menus;
+using System.Collections.Generic;
+using Microsoft.Xna.Framework;
 
-// Namespace should match your mod structure
-using NemosMagicMod.Spells;
 
 public class SpellSelectionMenu : IClickableMenu
 {
-    private readonly List<Spell> spells;
-    private int selectedSpellIndex = 0;
     private readonly IModHelper helper;
+    private readonly IMonitor monitor;
 
-    private readonly IMonitor Monitor;
+    private List<Spell> spells = new();
+    private int selectedSpellIndex = 0;
 
     public SpellSelectionMenu(IModHelper helper, IMonitor monitor)
         : base(Game1.uiViewport.Width / 2 - 300, Game1.uiViewport.Height / 2 - 225, 600, 450, true)
     {
         this.helper = helper;
-        this.Monitor = monitor;
-        this.spells = new List<Spell>();
+        this.monitor = monitor;
 
+        RefreshSpellList();
+    }
+
+    /// <summary>
+    /// Rebuilds the spell list and sets the selected index based on the currently prepared spell.
+    /// </summary>
+    private void RefreshSpellList()
+    {
+        spells.Clear();
         foreach (var spell in SpellRegistry.Spells)
         {
-            bool unlocked = SpellRegistry.PlayerData.IsSpellUnlocked(spell);
-            Monitor.Log($"Spell {spell.Name} (ID: {spell.Id}) unlocked? {unlocked}", LogLevel.Info);
+            if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
+                spells.Add(spell);
+        }
 
-            if (unlocked)
-            {
-                this.spells.Add(spell);
-            }
+        if (SpellRegistry.SelectedSpell != null)
+        {
+            int index = spells.FindIndex(s => s.Id == SpellRegistry.SelectedSpell.Id);
+            selectedSpellIndex = index >= 0 ? index : 0;
+        }
+        else
+        {
+            selectedSpellIndex = 0;
         }
     }
 
-
-
     public override void draw(SpriteBatch b)
     {
+        // Always refresh list in case unlocked spells changed since last menu
+        RefreshSpellList();
+
         // Draw menu background
         IClickableMenu.drawTextureBox(b, xPositionOnScreen, yPositionOnScreen, width, height, Color.White);
 
@@ -48,7 +60,6 @@ public class SpellSelectionMenu : IClickableMenu
         Vector2 titleSize = font.MeasureString(title);
         b.DrawString(font, title, new Vector2(xPositionOnScreen + width / 2 - titleSize.X / 2, yPositionOnScreen + 15), Color.Black);
 
-        // Get mouse position
         int mouseX = Game1.getMouseX();
         int mouseY = Game1.getMouseY();
 
@@ -61,22 +72,16 @@ public class SpellSelectionMenu : IClickableMenu
             bool isHovered = spellRect.Contains(mouseX, mouseY);
             bool isSelected = i == selectedSpellIndex;
 
-            // Simplified background highlight
             if (isSelected)
-            {
                 b.Draw(Game1.staminaRect, spellRect, Color.Gold * 0.3f);
-            }
             else if (isHovered)
-            {
                 b.Draw(Game1.staminaRect, spellRect, Color.Black * 0.1f);
-            }
 
-            // Draw spell name
             Color textColor = isSelected ? Color.DarkGoldenrod : Color.Black;
             b.DrawString(Game1.smallFont, spells[i].Name, pos, textColor);
         }
 
-        // Draw hover tooltip for the hovered spell
+        // Draw hover tooltip
         for (int i = 0; i < spells.Count; i++)
         {
             Rectangle spellRect = new Rectangle(xPositionOnScreen + 20, yPositionOnScreen + 60 + i * 40 - 5, width - 40, 35);
@@ -88,7 +93,6 @@ public class SpellSelectionMenu : IClickableMenu
             }
         }
 
-        // Draw cursor
         base.drawMouse(b);
     }
 

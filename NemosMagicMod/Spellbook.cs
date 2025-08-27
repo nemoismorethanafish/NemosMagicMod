@@ -19,7 +19,7 @@ public class Spellbook : Tool
     public override string Name => "Spellbook";
 
 
-    public static Texture2D? IconTexture;
+    public static Texture2D? SpellbookTexture;
 
     private readonly List<TemporaryAnimatedSprite> trackedSpellSprites = new();
 
@@ -30,7 +30,7 @@ public class Spellbook : Tool
 
     public static void LoadIcon(IModHelper helper)
     {
-        IconTexture = helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
+        SpellbookTexture = helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
     }
 
     public override bool canBeTrashed() => false;
@@ -66,16 +66,16 @@ public class Spellbook : Tool
 
     public override void drawInMenu(SpriteBatch spriteBatch, Vector2 location, float scaleSize, float transparency, float layerDepth, StackDrawType drawStackNumber, Color color, bool drawShadow)
     {
-        if (IconTexture == null)
+        if (SpellbookTexture == null)
             return;
 
         spriteBatch.Draw(
-            IconTexture,
+            SpellbookTexture,
             location + new Vector2(32f, 32f),
             null,
             color * transparency,
             0f,
-            new Vector2(IconTexture.Width / 2f, IconTexture.Height / 2f),
+            new Vector2(SpellbookTexture.Width / 2f, SpellbookTexture.Height / 2f),
             scaleSize * 4f,
             SpriteEffects.None,
             layerDepth
