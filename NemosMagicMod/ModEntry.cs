@@ -31,7 +31,7 @@ namespace NemosMagicMod
         public static PlayerSaveData SaveData = new();
 
         // === Active Spell Tracking ===
-        private static readonly List<Spell> ActiveSpells = new();
+        public static readonly List<Spell> ActiveSpells = new();
 
         public override void Entry(IModHelper helper)
         {
@@ -59,8 +59,6 @@ namespace NemosMagicMod
             helper.Events.Input.ButtonPressed += OnButtonPressed;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.Saving += OnSaving;
-
-            // Hook update loop for active spells
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
@@ -153,7 +151,7 @@ namespace NemosMagicMod
         }
 
         // === Active Spell Management ===
-        private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
+        public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
             if (!Context.IsWorldReady)
                 return;

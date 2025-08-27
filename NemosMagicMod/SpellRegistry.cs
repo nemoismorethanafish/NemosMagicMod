@@ -15,7 +15,7 @@ public static class SpellRegistry //List of all spells
 
 
     // Add this list so the menu can render all spells
-    public static readonly List<Spell> Spells = new()
+    public static List<Spell> Spells = new()
     {
         WindSpirit,
         Heal,

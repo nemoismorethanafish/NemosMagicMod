@@ -1,104 +1,89 @@
-﻿using HarmonyLib;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using StardewValley;
-using StardewValley.TerrainFeatures;
+using StardewModdingAPI.Events;
 using System;
 
-namespace NemosMagicMod
+public class TreeSpirit : Spell
 {
-    public class TreeSpirit : Spell
+    private Texture2D axeTexture;
+    private float activeTimer = 0f;
+    private readonly float duration = 10f; // seconds
+    private bool subscribed = false;
+
+    public bool IsActive => activeTimer > 0f;
+
+    public TreeSpirit()
+        : base("tree_spirit", "Tree Spirit", "Summons a spirit in the form of an axe.", 20, 50)
+    { }
+
+    public override void Cast(Farmer who)
     {
-        private Texture2D axeTexture;
-        private float activeTimer = 0f;
-        private readonly float duration = 10f; // Seconds spell lasts
-        private Vector2 spiritPosition;
+        base.Cast(who);
 
-        public bool IsActive => activeTimer > 0f;
-
-        public TreeSpirit()
-            : base(
-                  id: "tree_spirit",
-                  name: "Tree Spirit",
-                  description: "Summons a spirit in the form of an axe. While active, trees drop slightly more wood.",
-                  manaCost: 20,
-                  experienceGained: 50
-              )
+        try
         {
+            axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
+        }
+        catch
+        {
+            axeTexture = null;
         }
 
-        public override void Cast(Farmer who)
+        activeTimer = duration;
+
+        // Hook drawing once
+        if (!subscribed)
         {
-            base.Cast(who);
-
-            // Summon the spirit at the player's position
-            spiritPosition = who.Position;
-
-            // Load the steel axe texture
-            axeTexture = Game1.content.Load<Texture2D>("Tools/axe");
-
-            activeTimer = duration;
-
-            Game1.playSound("leafrustle");
+            ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+            subscribed = true;
         }
 
-        public override void Update(GameTime gameTime, Farmer who)
-        {
-            if (activeTimer > 0f)
-            {
-                activeTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
-            }
-        }
+        Game1.playSound("leafrustle");
+    }
 
-        public void Draw(SpriteBatch spriteBatch)
+    public override void Update(GameTime gameTime, Farmer who)
+    {
+        if (activeTimer > 0f)
+            activeTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+        else if (subscribed)
         {
-            if (IsActive && axeTexture != null)
-            {
-                spriteBatch.Draw(
-                    axeTexture,
-                    spiritPosition,
-                    null,
-                    Color.White,
-                    0f,
-                    new Vector2(axeTexture.Width / 2, axeTexture.Height / 2),
-                    1f,
-                    SpriteEffects.None,
-                    1f
-                );
-            }
-        }
-
-        /// <summary>
-        /// Increases wood drops by 25% while active
-        /// </summary>
-        public int ModifyWoodDrop(Tree tree, int baseAmount)
-        {
-            if (IsActive)
-            {
-                int extra = (int)Math.Ceiling(baseAmount * 0.25);
-                return baseAmount + extra;
-            }
-            return baseAmount;
+            // Unsubscribe when timer ends
+            ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
+            subscribed = false;
         }
     }
-}
 
-[HarmonyPatch(typeof(Tree), nameof(Tree.performToolAction))]
-public static class Tree_PerformToolAction_Patch
-{
-    static void Postfix(Tree __instance, Tool t, int damage, Vector2 tileLocation, GameLocation location)
+    private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
-        // Only apply if TreeSpirit is active
-        TreeSpirit treeSpirit = SpellRegistry.TreeSpirit;
-        if (treeSpirit.IsActive && t != null && t.Category == -96) // category -96 = axe
-        {
-            int baseWood = 1; // Adjust based on tree type if you want
-            int modifiedWood = treeSpirit.ModifyWoodDrop(__instance, baseWood);
+        if (!IsActive || axeTexture == null || Game1.player == null)
+            return;
 
-            // Spawn the extra wood
-            Game1.createObjectDebris("Wood", (int)tileLocation.X, (int)tileLocation.Y, modifiedWood);
-        }
+        SpriteBatch spriteBatch = e.SpriteBatch;
+
+        // Floating animation
+        float floatAmplitude = 10f;
+        float floatSpeed = 2f;
+        float bobbing = floatAmplitude * (float)Math.Sin(Game1.currentGameTime.TotalGameTime.TotalSeconds * floatSpeed);
+
+        float baseOffset = 48f;
+        float scale = 2f;
+
+        // Position above player
+        Vector2 worldPos = Game1.player.Position + new Vector2(0, -(baseOffset * scale + bobbing));
+        Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, worldPos);
+
+        spriteBatch.Draw(
+            axeTexture,
+            screenPos,
+            null,
+            Color.White,
+            0f,
+            new Vector2(axeTexture.Width / 2, axeTexture.Height / 2),
+            scale,
+            SpriteEffects.None,
+            1f // render on top
+        );
     }
 }
-
