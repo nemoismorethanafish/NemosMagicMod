@@ -26,9 +26,14 @@ namespace NemosMagicMod
 
         private ManaBar manaBar = null!;
 
+        public static PlayerSaveData SaveData = new();
+
+
         public override void Entry(IModHelper helper)
         {
             Instance = this;
+
+            new LevelUpChanges(helper, Monitor);
 
             // Setup mana bar etc.
             ManaManager.SetMaxMana(100);
@@ -48,6 +53,9 @@ namespace NemosMagicMod
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.Input.ButtonPressed += OnButtonPressed;
+            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
+            helper.Events.GameLoop.Saving += OnSaving;
+
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
@@ -70,8 +78,8 @@ namespace NemosMagicMod
 
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
-            // Optional: do something when save is loaded
-            // Maybe add spellbook here if you prefer, or do in DayStarted
+            SaveData = Helper.Data.ReadSaveData<PlayerSaveData>("player-save-data") ?? new PlayerSaveData();
+            Monitor.Log("✅ Save data loaded.", LogLevel.Info);
         }
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
@@ -90,6 +98,10 @@ namespace NemosMagicMod
             // Schedule UpdateMagicLevel to run on next tick to ensure SpaceCore is ready
             Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
 
+        }
+        private void OnSaving(object? sender, StardewModdingAPI.Events.SavingEventArgs e)
+        {
+            Helper.Data.WriteSaveData("player-save-data", SaveData);
         }
 
         private void RunUpdateMagicLevelOnce(object? sender, UpdateTickedEventArgs e)
@@ -132,7 +144,7 @@ namespace NemosMagicMod
 
             if (e.Button == SButton.D9)
             {
-                Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper);
+                Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper, this.Monitor);
             }
         }
     }

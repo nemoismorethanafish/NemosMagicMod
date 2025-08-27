@@ -14,20 +14,28 @@ public class SpellSelectionMenu : IClickableMenu
     private int selectedSpellIndex = 0;
     private readonly IModHelper helper;
 
-    public SpellSelectionMenu(IModHelper helper)
+    private readonly IMonitor Monitor;
+
+    public SpellSelectionMenu(IModHelper helper, IMonitor monitor)
         : base(Game1.uiViewport.Width / 2 - 300, Game1.uiViewport.Height / 2 - 225, 600, 450, true)
     {
         this.helper = helper;
+        this.Monitor = monitor;
         this.spells = new List<Spell>();
 
         foreach (var spell in SpellRegistry.Spells)
         {
-            if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
+            bool unlocked = SpellRegistry.PlayerData.IsSpellUnlocked(spell);
+            Monitor.Log($"Spell {spell.Name} (ID: {spell.Id}) unlocked? {unlocked}", LogLevel.Info);
+
+            if (unlocked)
             {
                 this.spells.Add(spell);
             }
         }
     }
+
+
 
     public override void draw(SpriteBatch b)
     {

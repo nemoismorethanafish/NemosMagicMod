@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using NemosMagicMod;
 using NemosMagicMod.Spells;
+using System.Collections.Generic;
 
 public static class SpellRegistry //List of all spells
 {
@@ -22,11 +23,10 @@ public static class SpellRegistry //List of all spells
 
     public static class PlayerData
     {
-        public static HashSet<string> UnlockedSpellIds = new HashSet<string>();
+        public static HashSet<string> UnlockedSpellIds => ModEntry.SaveData.UnlockedSpellIds;
 
         public static bool IsSpellUnlocked(Spell spell)
         {
-            // Always unlock these specific spells
             if (spell.Id == "nemo.WindSpirit" ||
                 spell.Id == "nemo.Heal" ||
                 spell.Id == "nemo.Fireball")
@@ -34,9 +34,10 @@ public static class SpellRegistry //List of all spells
                 return true;
             }
 
-            return UnlockedSpellIds.Contains(spell.Name);
+            return UnlockedSpellIds.Contains(spell.Id);
         }
     }
+
 
 
 }
