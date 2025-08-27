@@ -1,28 +1,36 @@
 ﻿using MagicSkill;
 using Microsoft.Xna.Framework.Graphics;
 using SpaceCore;
+using SpaceShared.APIs;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewValley;
 using System;
+using System.Linq;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
 {
+    public interface ISpaceCoreApi
+    {
+        void RegisterSerializerType(Type type);
+    }
     public class ModEntry : Mod
     {
-        public const string SkillID = "nemosmagicmod.Magic";
+        private ISpaceCoreApi? spaceCoreApi;
 
+        public const string SkillID = "nemosmagicmod.Magic";
         public static ModEntry Instance { get; private set; } = null!;
+        public static Texture2D MagicSkillIcon { get; private set; } = null!;
+        public static int MagicLevel = 0;
 
         private ManaBar manaBar = null!;
-
-        public static Texture2D MagicSkillIcon { get; private set; } = null!;
-
 
         public override void Entry(IModHelper helper)
         {
             Instance = this;
 
+            // Setup mana bar etc.
             ManaManager.SetMaxMana(100);
             ManaManager.Refill();
 
@@ -31,95 +39,127 @@ namespace NemosMagicMod
                 () => ManaManager.MaxMana,
                 10,
                 10);
-
             manaBar.SubscribeToEvents(helper);
 
-            // Load the spellbook icon texture once on mod entry
             Spellbook.LoadIcon(helper);
             MagicSkillIcon = Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
 
-
-            // Register Magic skill (uncommented as requested)
-            SkillRegistrar.Register(new Magic_Skill(), Monitor);
-
-            // Hook SaveLoaded event so we can add the spellbook when a save is loaded
+            helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
+            helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.Input.ButtonPressed += OnButtonPressed;
-
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
 
-        // This runs after a save is loaded, player is guaranteed to exist
-        private void OnSaveLoaded(object? sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
+        private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
-            var player = Game1.player;
-
-            if (player == null)
+            var spaceCoreApi = Helper.ModRegistry.GetApi<ISpaceCoreApi>("spacechase0.SpaceCore");
+            if (spaceCoreApi == null)
             {
-                Monitor.Log("Player not found on save loaded, skipping spellbook add.", LogLevel.Warn);
+                Monitor.Log("Could not get SpaceCore API. Is it installed correctly?", LogLevel.Error);
                 return;
             }
 
-            // Avoid adding duplicates
-            bool hasSpellbook = false;
-            foreach (var item in player.Items)
-            {
-                if (item is Spellbook)
-                {
-                    hasSpellbook = true;
-                    break;
-                }
-            }
+            spaceCoreApi.RegisterSerializerType(typeof(Spellbook));
+            Monitor.Log("Registered Spellbook with SpaceCore serializer.", LogLevel.Info);
 
+            SkillRegistrar.Register(new Magic_Skill(), Monitor);
+            Monitor.Log("Registered Magic skill during GameLaunched.", LogLevel.Info);
+        }
+
+        private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
+        {
+            // Optional: do something when save is loaded
+            // Maybe add spellbook here if you prefer, or do in DayStarted
+        }
+
+        private void OnDayStarted(object? sender, DayStartedEventArgs e)
+        {
+            var player = Game1.player;
+            if (player == null || player.Items == null)
+                return;
+
+            bool hasSpellbook = player.Items.Any(item => item is Spellbook);
             if (!hasSpellbook)
             {
                 player.addItemToInventory(new Spellbook());
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
-            else
+
+            // Schedule UpdateMagicLevel to run on next tick to ensure SpaceCore is ready
+            Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
+
+        }
+
+        private void RunUpdateMagicLevelOnce(object? sender, UpdateTickedEventArgs e)
+        {
+            // Unsubscribe immediately so it only runs once
+            Helper.Events.GameLoop.UpdateTicked -= RunUpdateMagicLevelOnce;
+
+            UpdateMagicLevel();
+        }
+
+        private void UpdateMagicLevel()
+        {
+            try
             {
-                Monitor.Log("Player already has a Spellbook, not adding.", LogLevel.Trace);
+                if (Game1.player == null)
+                {
+                    Monitor.Log("Player is null, cannot update MagicLevel.", LogLevel.Warn);
+                    return;
+                }
+
+                MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
+                Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                Monitor.Log($"Caught ArgumentOutOfRangeException in UpdateMagicLevel: {ex.Message}", LogLevel.Error);
+                // Could be SpaceCore skill list not ready yet, skip update this time
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Unexpected exception in UpdateMagicLevel: {ex}", LogLevel.Error);
             }
         }
-        private void OnButtonPressed(object? sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
+
+
+        private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
-            if (!Context.IsPlayerFree) // only allow when player isn't in a cutscene or menu
+            if (!Context.IsPlayerFree)
                 return;
 
-            // Use the number 9 key
             if (e.Button == SButton.D9)
             {
                 Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper);
             }
         }
-
     }
-}
 
-public static class SkillRegistrar
-{
-    public static void Register(Skill skill, IMonitor monitor)
+    public static class SkillRegistrar
     {
-        Skills.RegisterSkill(skill);
-
-        string queryKey = "PLAYER_" + skill.Id.ToUpper() + "_LEVEL";
-
-        try
+        public static void Register(Skill skill, IMonitor monitor)
         {
-            GameStateQuery.Register(queryKey, (args, ctx) =>
+            Skills.RegisterSkill(skill);
+
+            string queryKey = "PLAYER_" + skill.Id.ToUpper() + "_LEVEL";
+
+            try
             {
-                return GameStateQuery.Helpers.PlayerSkillLevelImpl(args, ctx.Player, f => f.GetCustomSkillLevel(skill));
-            });
+                GameStateQuery.Register(queryKey, (args, ctx) =>
+                {
+                    return GameStateQuery.Helpers.PlayerSkillLevelImpl(args, ctx.Player, f => f.GetCustomSkillLevel(skill));
+                });
 
-            monitor.Log($"GameStateQuery '{queryKey}' registered.", LogLevel.Info);
-        }
-        catch (InvalidOperationException)
-        {
-            monitor.Log($"GameStateQuery '{queryKey}' already registered, skipping.", LogLevel.Trace);
-        }
+                monitor.Log($"GameStateQuery '{queryKey}' registered.", LogLevel.Info);
+            }
+            catch (InvalidOperationException)
+            {
+                monitor.Log($"GameStateQuery '{queryKey}' already registered, skipping.", LogLevel.Trace);
+            }
 
-        monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
+            monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
+        }
     }
-
 }

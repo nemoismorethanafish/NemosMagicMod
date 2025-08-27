@@ -12,9 +12,16 @@ namespace NemosMagicMod.Spells
         private const float SpeedIncrease = 1; //This will be divided by four later
         private const int DurationMs = 60_000; // 60 seconds
 
-        public WindSpirit() : base("Wind Spirit", "Temporarily increases your movement speed.", 50, 10, ModEntry.SkillID, true)
-        {
-        }
+        public WindSpirit()
+            : base(
+                "nemo.WindSpirit",
+                "Wind Spirit",
+                "Temporarily increases your movement speed.",
+                50,
+                75
+              )
+        { }
+
 
         public override void Cast(Farmer who)
         {

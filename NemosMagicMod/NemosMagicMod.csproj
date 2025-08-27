@@ -1,29 +1,31 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-		<PropertyGroup>
-			<TargetFramework>net6.0</TargetFramework>
-			<LangVersion>latest</LangVersion>
-			<Nullable>enable</Nullable>
-		</PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="Assets\magic-icon.png" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Remove="Assets\magic-icon.png" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Assets\magic-icon.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
+	<ItemGroup>
+		<Reference Include="Microsoft.CSharp" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+	<ItemGroup>
+		<Content Include="Assets\magic-icon.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
-    <Reference Include="System.Xml" />
+	<ItemGroup>
+		<PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
 
-    <Reference Include="SpaceCore">
-      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods\SpaceCore\SpaceCore.dll</HintPath>
-    </Reference>
+		<Reference Include="System.Xml" />
 
-  </ItemGroup>
-
+		<Reference Include="SpaceCore">
+			<HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Stardew Valley\Mods\SpaceCore\SpaceCore.dll</HintPath>
+		</Reference>
+	</ItemGroup>
 </Project>

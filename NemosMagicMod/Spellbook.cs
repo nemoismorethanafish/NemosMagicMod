@@ -1,93 +1,84 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using StardewValley;
-using StardewValley.Tools;
 using StardewModdingAPI;
+using StardewValley;
 using System.Collections.Generic;
+using System.Xml.Serialization;
+using SpaceCore;
 
-namespace NemosMagicMod
+[XmlType("Mods_NemosMagicMod_Spellbook")]
+public class Spellbook : Tool
 {
-    public class Spellbook : Tool
+
+    public override string getDescription() => "A book filled with arcane knowledge.";
+
+    public override string getCategoryName() => "Magic";
+
+    public string GetSpriteName() => "NemosMagicMod.Spellbook";
+
+    public override string Name => "Spellbook";
+
+
+    public static Texture2D? IconTexture;
+
+    private readonly List<TemporaryAnimatedSprite> trackedSpellSprites = new();
+
+    public Spellbook() : base("Spellbook", 0, 0, 0, false)
     {
-        public static Texture2D? IconTexture;
+        UpgradeLevel = 0;
+    }
 
-        // Keep track of sprites spawned by casting spells so we can remove them cleanly
-        private readonly List<TemporaryAnimatedSprite> trackedSpellSprites = new();
+    public static void LoadIcon(IModHelper helper)
+    {
+        IconTexture = helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
+    }
 
-        public Spellbook() : base("Spellbook", 0, 0, 0, false)
+    public override bool canBeTrashed() => false;
+
+    public override string DisplayName => "Spellbook";
+
+    public override bool canBeShipped() => false;
+
+    public override bool canStackWith(ISalable other) => false;
+
+    protected override Item GetOneNew() => new Spellbook();
+
+    public override bool beginUsing(GameLocation location, int x, int y, Farmer who)
+    {
+        who.UsingTool = false;
+        who.canReleaseTool = true;
+        who.completelyStopAnimatingOrDoingAction();
+        who.Halt();
+
+        if (SpellRegistry.SelectedSpell != null && Game1.player != null)
         {
-            UpgradeLevel = 0;
+            SpellRegistry.SelectedSpell.Cast(Game1.player);
         }
 
-        public static void LoadIcon(IModHelper helper)
-        {
-            IconTexture = helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
-        }
+        return false;
+    }
 
-        protected override Item GetOneNew()
-        {
-            return new Spellbook();
-        }
+    public override bool onRelease(GameLocation location, int x, int y, Farmer who) => false;
 
-        public override bool canBeTrashed()
-        {
-            return false;
-        }
+    public override void DoFunction(GameLocation location, int x, int y, int power, Farmer who) { }
 
-        // Prevent the default tool animation from triggering
-        public override bool beginUsing(GameLocation location, int x, int y, Farmer who)
-        {
-            who.UsingTool = false;
-            who.canReleaseTool = true;
-            who.completelyStopAnimatingOrDoingAction();
-            who.Halt();
+    public override void tickUpdate(GameTime time, Farmer who) { }
 
-            // Cast the spell here instead of in DoFunction
-            if (SpellRegistry.SelectedSpell != null)
-            {
-                // Clear old sprites as needed, then cast
-                // Example:
-                if (SpellRegistry.SelectedSpell != null && Game1.player != null)
-                {
-                    SpellRegistry.SelectedSpell.Cast(Game1.player);
-                }
-            }
+    public override void drawInMenu(SpriteBatch spriteBatch, Vector2 location, float scaleSize, float transparency, float layerDepth, StackDrawType drawStackNumber, Color color, bool drawShadow)
+    {
+        if (IconTexture == null)
+            return;
 
-            return false; // prevent animation
-        }
-
-        public override bool onRelease(GameLocation location, int x, int y, Farmer who)
-        {
-            return false; // no extra action on release
-        }
-
-        public override void DoFunction(GameLocation location, int x, int y, int power, Farmer who)
-        {
-            // Intentionally left empty since casting is handled in beginUsing
-        }
-
-        // Override tickUpdate to do nothing, avoiding default tool behavior
-        public override void tickUpdate(GameTime time, Farmer who)
-        {
-            // Intentionally left blank
-        }
-
-        public override void drawInMenu(SpriteBatch spriteBatch, Vector2 location, float scaleSize, float transparency, float layerDepth, StackDrawType drawStackNumber, Color color, bool drawShadow)
-        {
-            if (IconTexture == null)
-                return;
-
-            spriteBatch.Draw(
-                IconTexture,
-                location + new Vector2(32f, 32f),
-                null,
-                color * transparency,
-                0f,
-                new Vector2(IconTexture.Width / 2f, IconTexture.Height / 2f),
-                scaleSize * 4f,
-                SpriteEffects.None,
-                layerDepth
-            );
-        }
+        spriteBatch.Draw(
+            IconTexture,
+            location + new Vector2(32f, 32f),
+            null,
+            color * transparency,
+            0f,
+            new Vector2(IconTexture.Width / 2f, IconTexture.Height / 2f),
+            scaleSize * 4f,
+            SpriteEffects.None,
+            layerDepth
+        );
     }
 }
