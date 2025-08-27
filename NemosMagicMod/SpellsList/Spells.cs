@@ -10,6 +10,8 @@ public abstract class Spell
 {
     public const string SkillID = ModEntry.SkillID;
 
+    protected virtual bool FreezePlayerDuringCast => true; // default: freeze
+
     public string Id { get; }
     public string Name { get; }
     public string Description { get; }
@@ -66,8 +68,8 @@ public abstract class Spell
         // Start spellbook animation
         spellbookTimer = SpellbookDuration;
 
-        // Stop movement during casting
-        who.canMove = false;
+        if (FreezePlayerDuringCast)
+            who.canMove = false;
 
         // Subscribe to rendering & update events
         SubscribeDraw();
@@ -105,7 +107,8 @@ public abstract class Spell
         subscribedDraw = false;
 
         // Restore movement
-        Game1.player.canMove = true;
+        if (FreezePlayerDuringCast)
+            Game1.player.canMove = true;
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)

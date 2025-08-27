@@ -9,6 +9,8 @@ namespace NemosMagicMod.Spells
     public class FireballCantrip : Spell
     {
         public override bool IsUnlocked => false; // set this to true when cantrip is selected
+        protected override bool FreezePlayerDuringCast => false;
+
 
         public FireballCantrip()
             : base(
