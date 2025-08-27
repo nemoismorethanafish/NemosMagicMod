@@ -17,7 +17,15 @@ public class SpellSelectionMenu : IClickableMenu
     public SpellSelectionMenu(IModHelper helper)
         : base(Game1.uiViewport.Width / 2 - 200, Game1.uiViewport.Height / 2 - 150, 400, 300, true)
     {
-        this.spells = SpellRegistry.Spells;  // Directly use the SpellRegistry list
+        this.spells = new List<Spell>();
+        foreach (var spell in SpellRegistry.Spells)
+        {
+            if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
+            {
+                this.spells.Add(spell);
+            }
+        }
+
         this.helper = helper;
     }
 

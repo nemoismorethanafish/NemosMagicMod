@@ -10,6 +10,8 @@ namespace NemosMagicMod
 {
     public class ModEntry : Mod
     {
+        public const string SkillID = "nemosmagicmod.Magic";
+
         public static ModEntry Instance { get; private set; } = null!;
 
         private ManaBar manaBar = null!;

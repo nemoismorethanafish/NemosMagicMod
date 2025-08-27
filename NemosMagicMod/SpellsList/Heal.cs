@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewValley;
+using NemosMagicMod;
 
 namespace NemosMagicMod.Spells
 {
@@ -7,12 +8,18 @@ namespace NemosMagicMod.Spells
     {
         private const int HealAmount = 40;
 
-        public Heal() : base("Heal", 5, "Restores some health.", 100)
+        public Heal() : base("Heal", "Restores some health.", 5, 100, ModEntry.SkillID, true)
         {
         }
 
         public override void Cast(Farmer who)
         {
+            if (!ManaManager.HasEnoughMana(ManaCost))
+            {
+                Game1.showRedMessage("Not enough mana!");
+                return;
+            }
+
             base.Cast(who);
 
             if (who.health < who.maxHealth)

@@ -1,25 +1,29 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewValley;
+using SpaceCore;
+using System.Linq;
 
 namespace NemosMagicMod.Spells
 {
     public abstract class Spell
     {
         public string Name { get; }
-        public int SkillLevelRequired { get; }
         public string Description { get; }
         public int ManaCost { get; }
+        public int ExperienceGained { get; }
+        public string SkillId { get; }
+        public bool IsSpellUnlocked { get; }
 
-        // Constructor
-        public Spell(string name, int skillLevelRequired, string description, int manaCost)
+        public Spell(string name, string description, int manaCost, int experienceGained, string skillId, bool isSpellUnlocked)
         {
             Name = name;
-            SkillLevelRequired = skillLevelRequired;
             Description = description;
             ManaCost = manaCost;
+            ExperienceGained = experienceGained;
+            SkillId = skillId;
+            IsSpellUnlocked = isSpellUnlocked;
         }
 
-        // Cast the spell (override this for actual functionality)
         public virtual void Cast(Farmer who)
         {
             if (!ManaManager.HasEnoughMana(ManaCost))
@@ -29,18 +33,16 @@ namespace NemosMagicMod.Spells
             }
 
             ManaManager.SpendMana(ManaCost);
+            GrantExperience(who);
         }
 
-        // The Update method can be overridden for spells that need updates each frame
-        public virtual void Update(GameTime gameTime, Farmer who)
+        protected virtual void GrantExperience(Farmer who)
         {
-            // Default implementation: no behavior
+            Skills.AddExperience(who, SkillId, ExperienceGained);
+            string readableName = SkillId.Split('.').Last(); // e.g. "Magic"
+            Game1.showGlobalMessage($"{who.Name} gained {ExperienceGained} {readableName} experience!");
         }
 
-        // The IsExpired method (for spells with duration)
-        public virtual bool IsExpired()
-        {
-            return false; // Default: not expired
-        }
+        public virtual void Update(GameTime gameTime, Farmer who) { }
     }
 }

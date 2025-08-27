@@ -6,22 +6,20 @@ using StardewValley.Projectiles;
 
 namespace NemosMagicMod.Spells
 {
-    public class Fireball : Spell
+    public class FireballCantrip : Spell
     {
-        public Fireball()
-            : base("Fireball", "Throws a fiery explosive projectile.", 5, 10, ModEntry.SkillID, true)
+        public FireballCantrip()
+            : base("Fireball", "Throws a fiery explosive projectile.", 0, 0, ModEntry.SkillID, false)
         { }
 
         public override void Cast(Farmer who)
         {
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
-
+            //if (!ManaManager.HasEnoughMana(ManaCost))
+            //{
+            //    Game1.showRedMessage("Not enough mana!");
+            //    return;
+            //}
             base.Cast(who);
-
 
             //Game1.showGlobalMessage("You hurl a fireball!");
             NemosMagicMod.ModEntry.Instance.Monitor.Log("Fireball cast via spellbook!", LogLevel.Info);
@@ -34,7 +32,7 @@ namespace NemosMagicMod.Spells
             Vector2 startPosition = new Vector2(who.getStandingPosition().X, who.getStandingPosition().Y);
             Vector2 velocity = cursorWorldPos - startPosition;
             velocity.Normalize();
-            velocity *= 10f; // Projectile speed
+            velocity *= 8f; // Projectile speed
 
             // Get projectile texture and source rectangle
             Texture2D projectileTexture = Game1.mouseCursors;

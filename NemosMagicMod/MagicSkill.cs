@@ -19,7 +19,7 @@ namespace MagicSkill
             // Assign both the main icon and skill page icon
             Texture2D icon = NemosMagicMod.ModEntry.MagicSkillIcon;
             this.Icon = icon;
-            this.SkillsPageIcon = icon;
+            this.SkillsPageIcon = icon; //change this to fix the size issue on the skills page
         }
 
         public override string GetName() => "Magic";

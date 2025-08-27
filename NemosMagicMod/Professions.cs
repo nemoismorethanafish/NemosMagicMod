@@ -4,8 +4,8 @@ using System;
 public enum MagicProfession
 {
     None = 0,
-    WindSpirit = 1,
-    Fireball = 2,
+    WindSpiritCantripProfession = 1,
+    FireballCantripProfession = 2,
 }
 
 public static class ProfessionManager
