@@ -13,6 +13,9 @@ public static class SpellRegistry //List of all spells
     public static Spell TreeSpirit { get; } = new TreeSpirit();
     public static Spell EarthSpirit { get; } = new EarthSpirit();
 
+    public static Spell SeaSpirit { get; } = new SeaSpirit();
+
+
 
 
     // Add this list so the menu can render all spells
@@ -23,7 +26,8 @@ public static class SpellRegistry //List of all spells
         Fireball,
         WaterSpirit,
         TreeSpirit,
-        EarthSpirit
+        EarthSpirit,
+        SeaSpirit
     };
 
 
@@ -39,7 +43,8 @@ public static class SpellRegistry //List of all spells
                 spell.Id == "nemo.Heal" ||
                 spell.Id == "nemo.Fireball" ||
 
-                spell.Id == "nemo.EarthSpirit")
+                spell.Id == "nemo.EarthSpirit" ||
+                spell.Id == "nemo.SeaSpirit")
             {
                 return true;
             }

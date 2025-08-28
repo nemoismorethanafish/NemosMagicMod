@@ -1,13 +1,15 @@
-﻿using MagicSkill;
+﻿using HarmonyLib;
+using MagicSkill;
 using Microsoft.Xna.Framework.Graphics;
+using NemosMagicMod.Spells;
 using SpaceCore;
 using SpaceShared.APIs;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
@@ -36,6 +38,8 @@ namespace NemosMagicMod
         public override void Entry(IModHelper helper)
         {
             Instance = this;
+
+            SeaSpiritFishingIntegration.RegisterEvents(this.Helper);
 
             new LevelUpChanges(helper, Monitor);
 
