@@ -11,6 +11,7 @@ public static class SpellRegistry //List of all spells
     public static Spell Fireball = new Fireball();
     public static Spell WaterSpirit = new WaterSpirit();
     public static Spell TreeSpirit { get; } = new TreeSpirit();
+    public static Spell EarthSpirit { get; } = new EarthSpirit();
 
 
 
@@ -21,7 +22,8 @@ public static class SpellRegistry //List of all spells
         Heal,
         Fireball,
         WaterSpirit,
-        TreeSpirit
+        TreeSpirit,
+        EarthSpirit
     };
 
 
@@ -35,7 +37,9 @@ public static class SpellRegistry //List of all spells
         {
             if (spell.Id == "nemo.WindSpirit" ||
                 spell.Id == "nemo.Heal" ||
-                spell.Id == "nemo.Fireball")
+                spell.Id == "nemo.Fireball" ||
+
+                spell.Id == "nemo.EarthSpirit")
             {
                 return true;
             }

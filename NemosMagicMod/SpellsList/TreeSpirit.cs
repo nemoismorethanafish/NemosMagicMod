@@ -18,7 +18,9 @@ public class TreeSpirit : Spell, IRenderable
 
     private float spellTimer = 0f;
     private readonly float spellDuration = 10f;
-    private readonly int chopDamage = 1; // reduced damage per chop
+    private readonly int chopDamage = 1;
+
+    private readonly float hoverHeight = 32f;
 
     public bool IsActive { get; private set; }
 
@@ -35,8 +37,8 @@ public class TreeSpirit : Spell, IRenderable
     private Farmer owner;
 
     public TreeSpirit()
-        : base("spirit_tree", "Spirit Tree",
-              "Summons a magical axe that chops in a straight line.",
+        : base("spirit_tree", "Tree Spirit",
+              "Summons a magical axe that chops trees.",
               30, 50)
     {
         axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
@@ -115,7 +117,7 @@ public class TreeSpirit : Spell, IRenderable
 
         if (currentTargetTile != null)
         {
-            Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2);
+            Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -hoverHeight);
             Vector2 direction = targetWorld - axePosition;
 
             if (direction.LengthSquared() > 4f)
