@@ -5,7 +5,6 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.TerrainFeatures;
 using System;
-using System.Collections.Generic;
 using static Spell;
 
 public class TreeSpirit : Spell, IRenderable
@@ -13,25 +12,27 @@ public class TreeSpirit : Spell, IRenderable
     private Texture2D axeTexture;
 
     private bool subscribed = false;
-    private float spellTimer = 0f;
-    private readonly float spellDuration = 10f;
 
     private Vector2 axePosition;
-    private Vector2 axeVelocity;
     private readonly float moveSpeed = 128f;
+
+    private float spellTimer = 0f;
+    private readonly float spellDuration = 10f;
+    private readonly int chopDamage = 1; // reduced damage per chop
 
     public bool IsActive { get; private set; }
 
-    // Seeking & chopping
     private Vector2? currentTargetTile = null;
     private float chopTimer = 0f;
     private readonly float chopInterval = 0.5f;
 
-    // Swing animation
     private float swingAngle = 0f;
     private float swingSpeed = 5f;
     private int swingDirection = 1;
     private float maxSwingAngle = 0.5f;
+
+    private bool isReturning = false;
+    private Farmer owner;
 
     public TreeSpirit()
         : base("spirit_tree", "Spirit Tree",
@@ -60,6 +61,8 @@ public class TreeSpirit : Spell, IRenderable
 
         base.Cast(who);
 
+        owner = who;
+
         foreach (var spell in ModEntry.ActiveSpells)
         {
             if (spell is IRenderable renderable)
@@ -70,7 +73,8 @@ public class TreeSpirit : Spell, IRenderable
 
         IsActive = true;
         spellTimer = 0f;
-
+        currentTargetTile = null;
+        isReturning = false;
         axePosition = who.Position + new Vector2(0, -64f);
 
         if (!subscribed)
@@ -92,7 +96,15 @@ public class TreeSpirit : Spell, IRenderable
         }
 
         float deltaSeconds = 1f / 60f;
+
+        // Update spell timer
         spellTimer += deltaSeconds;
+        if (spellTimer >= spellDuration)
+        {
+            IsActive = false;
+            Unsubscribe();
+            return;
+        }
 
         // Find nearest tree if no target
         if (currentTargetTile == null)
@@ -113,7 +125,6 @@ public class TreeSpirit : Spell, IRenderable
             }
             else
             {
-                // At tree → chop with interval
                 chopTimer += deltaSeconds;
                 if (chopTimer >= chopInterval)
                 {
@@ -121,7 +132,7 @@ public class TreeSpirit : Spell, IRenderable
                     chopTimer = 0f;
                 }
 
-                // Animate swing
+                // Swing animation
                 swingAngle += swingDirection * swingSpeed * deltaSeconds;
                 if (swingAngle > maxSwingAngle)
                 {
@@ -134,19 +145,29 @@ public class TreeSpirit : Spell, IRenderable
                     swingDirection = 1;
                 }
 
-                // If tree destroyed, clear target
                 if (!Game1.currentLocation.terrainFeatures.ContainsKey(currentTargetTile.Value))
                 {
                     currentTargetTile = null;
                     swingAngle = 0f;
                 }
             }
+
+            isReturning = false;
+        }
+        else
+        {
+            isReturning = true;
         }
 
-        if (spellTimer >= spellDuration)
+        // Follow player
+        if (isReturning && owner != null)
         {
-            IsActive = false;
-            Unsubscribe();
+            Vector2 direction = owner.Position - axePosition;
+            if (direction.LengthSquared() > 4f)
+            {
+                direction.Normalize();
+                axePosition += direction * moveSpeed * deltaSeconds;
+            }
         }
     }
 
@@ -186,7 +207,9 @@ public class TreeSpirit : Spell, IRenderable
             try
             {
                 tree.shake(tile, tree.growthStage.Value >= 5);
-                tree.health.Value -= 20;
+                tree.health.Value -= chopDamage; // reduced damage
+                SpawnWoodChips(tile);
+                Game1.playSound("axchop");
 
                 if (tree.health.Value <= 0)
                 {
@@ -245,15 +268,32 @@ public class TreeSpirit : Spell, IRenderable
                         Game1.createDebris(seedIndex, (int)tile.X, (int)tile.Y, 1, Game1.currentLocation);
                     }
                 }
-                else
-                {
-                    Game1.playSound("axchop");
-                }
             }
             catch (Exception ex)
             {
                 ModEntry.Instance.Monitor.Log($"Failed to chop tree at {tile}: {ex}", StardewModdingAPI.LogLevel.Warn);
             }
+        }
+    }
+
+    private void SpawnWoodChips(Vector2 tile)
+    {
+        if (Game1.currentLocation == null) return;
+
+        int count = Game1.random.Next(3, 7);
+        for (int i = 0; i < count; i++)
+        {
+            var sprite = new TemporaryAnimatedSprite(
+                10,
+                tile * Game1.tileSize + new Vector2(Game1.random.Next(-16, 16), Game1.random.Next(-16, 16)),
+                Color.BurlyWood,
+                4,
+                false,
+                0.1f
+            );
+            sprite.scale = 1f;
+            sprite.layerDepth = 1f;
+            Game1.currentLocation.temporarySprites.Add(sprite);
         }
     }
 
