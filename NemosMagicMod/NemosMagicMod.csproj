@@ -8,6 +8,10 @@
 		<GamePath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley</GamePath>
 		<ModsPath>$(GamePath)\Mods</ModsPath>
 	</PropertyGroup>
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
 
 	<ItemGroup>
 		<!-- SMAPI build helper -->

@@ -10,7 +10,7 @@ public static class SpellRegistry //List of all spells
     public static Spell Heal = new Heal();
     public static Spell Fireball = new Fireball();
     public static Spell WaterSpirit = new WaterSpirit();
-    public static TreeSpirit TreeSpirit { get; } = new TreeSpirit();
+    public static Spell TreeSpirit { get; } = new TreeSpirit();
 
 
 
