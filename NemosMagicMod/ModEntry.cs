@@ -37,8 +37,6 @@ namespace NemosMagicMod
         {
             Instance = this;
 
-            new LevelUpChanges(helper, Monitor);
-
             // Setup mana bar etc.
             ManaManager.SetMaxMana(100);
             ManaManager.Refill();
