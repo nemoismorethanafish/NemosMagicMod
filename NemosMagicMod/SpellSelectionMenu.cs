@@ -1,10 +1,10 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 using System.Collections.Generic;
-using Microsoft.Xna.Framework;
-
 
 public class SpellSelectionMenu : IClickableMenu
 {
@@ -13,6 +13,10 @@ public class SpellSelectionMenu : IClickableMenu
 
     private List<Spell> spells = new();
     private int selectedSpellIndex = 0;
+
+    // Layout
+    private const int maxPerColumn = 8;
+    private const int spellSpacing = 40;
 
     public SpellSelectionMenu(IModHelper helper, IMonitor monitor)
         : base(Game1.uiViewport.Width / 2 - 300, Game1.uiViewport.Height / 2 - 225, 600, 450, true)
@@ -23,17 +27,12 @@ public class SpellSelectionMenu : IClickableMenu
         RefreshSpellList();
     }
 
-    /// <summary>
-    /// Rebuilds the spell list and sets the selected index based on the currently prepared spell.
-    /// </summary>
     private void RefreshSpellList()
     {
         spells.Clear();
         foreach (var spell in SpellRegistry.Spells)
-        {
             if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
                 spells.Add(spell);
-        }
 
         if (SpellRegistry.SelectedSpell != null)
         {
@@ -48,11 +47,10 @@ public class SpellSelectionMenu : IClickableMenu
 
     public override void draw(SpriteBatch b)
     {
-        // Always refresh list in case unlocked spells changed since last menu
         RefreshSpellList();
 
         // Draw menu background
-        IClickableMenu.drawTextureBox(b, xPositionOnScreen, yPositionOnScreen, width, height, Color.White);
+        b.Draw(Game1.staminaRect, new Rectangle(xPositionOnScreen, yPositionOnScreen, width, height), new Color(240, 230, 180));
 
         // Draw title
         SpriteFont font = Game1.dialogueFont;
@@ -63,34 +61,48 @@ public class SpellSelectionMenu : IClickableMenu
         int mouseX = Game1.getMouseX();
         int mouseY = Game1.getMouseY();
 
-        // Draw spell list
+        int columnWidth = width / 2 - 40;
+
+        // Keep track of hovered spell for tooltip
+        Spell hoveredSpell = null;
+
+        // Draw two-column spell list
         for (int i = 0; i < spells.Count; i++)
         {
-            Vector2 pos = new Vector2(xPositionOnScreen + 30, yPositionOnScreen + 60 + i * 40);
-            Rectangle spellRect = new Rectangle((int)pos.X - 10, (int)pos.Y - 5, width - 60, 35);
+            int column = i / maxPerColumn;
+            int row = i % maxPerColumn;
 
-            bool isHovered = spellRect.Contains(mouseX, mouseY);
+            Vector2 pos = new Vector2(
+                xPositionOnScreen + 30 + column * (width / 2),
+                yPositionOnScreen + 60 + row * spellSpacing
+            );
+
+            Rectangle spellBorder = new Rectangle((int)pos.X - 10, (int)pos.Y - 5, columnWidth, 35);
+
+            bool isHovered = spellBorder.Contains(mouseX, mouseY);
             bool isSelected = i == selectedSpellIndex;
 
+            // Draw subtle border
+            b.Draw(Game1.staminaRect, spellBorder, new Color(150, 100, 50, 180));
+
+            // Fill background for hover/selected
             if (isSelected)
-                b.Draw(Game1.staminaRect, spellRect, Color.Gold * 0.3f);
+                b.Draw(Game1.staminaRect, spellBorder, new Color(255, 215, 0, 120)); // light gold
             else if (isHovered)
-                b.Draw(Game1.staminaRect, spellRect, Color.Black * 0.1f);
+                b.Draw(Game1.staminaRect, spellBorder, new Color(255, 255, 255, 80)); // light white
 
             Color textColor = isSelected ? Color.DarkGoldenrod : Color.Black;
             b.DrawString(Game1.smallFont, spells[i].Name, pos, textColor);
+
+            if (isHovered)
+                hoveredSpell = spells[i];
         }
 
-        // Draw hover tooltip
-        for (int i = 0; i < spells.Count; i++)
+        // Draw tooltip on top of everything
+        if (hoveredSpell != null)
         {
-            Rectangle spellRect = new Rectangle(xPositionOnScreen + 20, yPositionOnScreen + 60 + i * 40 - 5, width - 40, 35);
-            if (spellRect.Contains(mouseX, mouseY))
-            {
-                string tooltip = $"{spells[i].Description}\nMana Cost: {spells[i].ManaCost}";
-                IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
-                break;
-            }
+            string tooltip = $"{hoveredSpell.Description}\nMana Cost: {hoveredSpell.ManaCost}";
+            IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
         }
 
         base.drawMouse(b);
@@ -98,10 +110,21 @@ public class SpellSelectionMenu : IClickableMenu
 
     public override void receiveLeftClick(int x, int y, bool playSound = true)
     {
+        int columnWidth = width / 2 - 40;
+
         for (int i = 0; i < spells.Count; i++)
         {
-            Rectangle spellRect = new Rectangle(xPositionOnScreen + 30, yPositionOnScreen + 60 + i * 40 - 5, width - 60, 35);
-            if (spellRect.Contains(x, y))
+            int column = i / maxPerColumn;
+            int row = i % maxPerColumn;
+
+            Rectangle spellBorder = new Rectangle(
+                xPositionOnScreen + 30 + column * (width / 2) - 10,
+                yPositionOnScreen + 60 + row * spellSpacing - 5,
+                columnWidth,
+                35
+            );
+
+            if (spellBorder.Contains(x, y))
             {
                 selectedSpellIndex = i;
                 Game1.playSound("smallSelect");
@@ -115,25 +138,39 @@ public class SpellSelectionMenu : IClickableMenu
         }
     }
 
-    public override void receiveKeyPress(Microsoft.Xna.Framework.Input.Keys key)
+    public override void receiveKeyPress(Keys key)
     {
-        if (key == Microsoft.Xna.Framework.Input.Keys.Up)
+        if (key == Keys.Up)
         {
-            selectedSpellIndex = (selectedSpellIndex - 1 + spells.Count) % spells.Count;
+            if (selectedSpellIndex % maxPerColumn > 0)
+                selectedSpellIndex--;
             Game1.playSound("shiny4");
         }
-        else if (key == Microsoft.Xna.Framework.Input.Keys.Down)
+        else if (key == Keys.Down)
         {
-            selectedSpellIndex = (selectedSpellIndex + 1) % spells.Count;
+            if (selectedSpellIndex % maxPerColumn < maxPerColumn - 1 && selectedSpellIndex + 1 < spells.Count)
+                selectedSpellIndex++;
             Game1.playSound("shiny4");
         }
-        else if (key == Microsoft.Xna.Framework.Input.Keys.Enter)
+        else if (key == Keys.Left)
+        {
+            if (selectedSpellIndex >= maxPerColumn)
+                selectedSpellIndex -= maxPerColumn;
+            Game1.playSound("shiny4");
+        }
+        else if (key == Keys.Right)
+        {
+            if (selectedSpellIndex + maxPerColumn < spells.Count)
+                selectedSpellIndex += maxPerColumn;
+            Game1.playSound("shiny4");
+        }
+        else if (key == Keys.Enter)
         {
             spells[selectedSpellIndex].Cast(Game1.player);
             Game1.exitActiveMenu();
             Game1.playSound("coin");
         }
-        else if (key == Microsoft.Xna.Framework.Input.Keys.Escape)
+        else if (key == Keys.Escape)
         {
             Game1.exitActiveMenu();
         }
