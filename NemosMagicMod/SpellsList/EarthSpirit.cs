@@ -3,13 +3,14 @@ using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using StardewModdingAPI.Events;
 using StardewValley;
-using StardewValley.Objects;
+using StardewValley.Tools;
 using System;
 using static Spell;
 
 public class EarthSpirit : Spell, IRenderable
 {
     private Texture2D pickaxeTexture;
+    private Pickaxe pickaxe;
 
     private bool subscribed = false;
     private Vector2 toolPosition;
@@ -39,6 +40,7 @@ public class EarthSpirit : Spell, IRenderable
               30, 50)
     {
         pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
+        pickaxe = new Pickaxe(); // vanilla tool instance
     }
 
     public void Unsubscribe()
@@ -149,7 +151,7 @@ public class EarthSpirit : Spell, IRenderable
             isReturning = true;
         }
 
-        // Follow player
+        // Return to player if no target
         if (isReturning && owner != null)
         {
             Vector2 direction = owner.Position - toolPosition;
@@ -189,44 +191,23 @@ public class EarthSpirit : Spell, IRenderable
 
     private void MineRockAt(Vector2 tile)
     {
-        if (Game1.currentLocation == null) return;
+        if (Game1.currentLocation == null || owner == null) return;
 
         if (!Game1.currentLocation.objects.TryGetValue(tile, out var obj) || !IsMineableRock(obj))
             return;
 
         try
         {
-            // Spawn drops manually
-            int dropIndex = 0;
-            int minCount = 1, maxCount = 3;
+            float oldStamina = owner.stamina;
 
-            switch (obj.Name)
-            {
-                case string s when s.Contains("Stone"):
-                    dropIndex = 390; // stone
-                    minCount = 1; maxCount = 3;
-                    break;
-                case string s when s.Contains("Iron Ore"):
-                    dropIndex = 380; minCount = 1; maxCount = 2; break;
-                case string s when s.Contains("Gold Ore"):
-                    dropIndex = 384; minCount = 1; maxCount = 2; break;
-                case string s when s.Contains("Geode"):
-                    dropIndex = 535; minCount = 1; maxCount = 1; break;
-                default:
-                    dropIndex = 390; minCount = 1; maxCount = 2; break;
-            }
+            // Use the pickaxe’s DoFunction like a normal tool swing
+            pickaxe.DoFunction(Game1.currentLocation, (int)tile.X * Game1.tileSize, (int)tile.Y * Game1.tileSize, 1, owner);
 
-            int amount = Game1.random.Next(minCount, maxCount + 1);
-            Game1.createMultipleObjectDebris($"(O){dropIndex}", (int)tile.X, (int)tile.Y, amount, Game1.currentLocation);
+            // Prevent stamina drain
+            owner.stamina = oldStamina;
 
-            // Spawn particle chips
-            SpawnStoneChips(tile);
-
-            // Play mining sound
             Game1.playSound("hammer");
-
-            // Remove rock from map
-            Game1.currentLocation.objects.Remove(tile);
+            Game1.currentLocation.temporarySprites.Add(new TemporaryAnimatedSprite(12, tile * Game1.tileSize, Color.Gray));
         }
         catch (Exception ex)
         {
@@ -237,27 +218,6 @@ public class EarthSpirit : Spell, IRenderable
     private bool IsMineableRock(StardewValley.Object obj)
     {
         return obj != null && (obj.Name.Contains("Stone") || obj.Name.Contains("Ore") || obj.Name.Contains("Geode"));
-    }
-
-    private void SpawnStoneChips(Vector2 tile)
-    {
-        if (Game1.currentLocation == null) return;
-
-        int count = Game1.random.Next(3, 7);
-        for (int i = 0; i < count; i++)
-        {
-            var sprite = new TemporaryAnimatedSprite(
-                10,
-                tile * Game1.tileSize + new Vector2(Game1.random.Next(-16, 16), Game1.random.Next(-16, 16)),
-                Color.Gray,
-                4,
-                false,
-                0.1f
-            );
-            sprite.scale = 1f;
-            sprite.layerDepth = 1f;
-            Game1.currentLocation.temporarySprites.Add(sprite);
-        }
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
