@@ -4,42 +4,37 @@ using NemosMagicMod;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.TerrainFeatures;
+using StardewValley.Tools;
 using System;
 using static Spell;
 
 public class TreeSpirit : Spell, IRenderable
 {
     private Texture2D axeTexture;
-
+    private Farmer owner;
     private bool subscribed = false;
 
     private Vector2 axePosition;
-    private readonly float moveSpeed = 128f;
+    private readonly float moveSpeed = 256f;
 
     private float spellTimer = 0f;
-    private readonly float spellDuration = 10f;
-    private readonly int chopDamage = 1;
-
-    private readonly float hoverHeight = 32f;
-
-    public bool IsActive { get; private set; }
+    private readonly float spellDuration = 20f;
 
     private Vector2? currentTargetTile = null;
     private float chopTimer = 0f;
-    private readonly float chopInterval = 0.5f;
+    private readonly float chopInterval = 0.8f;
 
     private float swingAngle = 0f;
     private float swingSpeed = 5f;
     private int swingDirection = 1;
     private float maxSwingAngle = 0.5f;
 
-    private bool isReturning = false;
-    private Farmer owner;
+    public bool IsActive { get; private set; }
 
     public TreeSpirit()
         : base("spirit_tree", "Tree Spirit",
               "Summons a magical axe that chops trees.",
-              30, 50)
+              30, 50, false) // <-- fixed constructor
     {
         axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
     }
@@ -64,19 +59,9 @@ public class TreeSpirit : Spell, IRenderable
         base.Cast(who);
 
         owner = who;
-
-        foreach (var spell in ModEntry.ActiveSpells)
-        {
-            if (spell is IRenderable renderable)
-                renderable.Unsubscribe();
-
-            spell.IsActive = false;
-        }
-
         IsActive = true;
         spellTimer = 0f;
         currentTargetTile = null;
-        isReturning = false;
         axePosition = who.Position + new Vector2(0, -64f);
 
         if (!subscribed)
@@ -99,7 +84,7 @@ public class TreeSpirit : Spell, IRenderable
 
         float deltaSeconds = 1f / 60f;
 
-        // Update spell timer
+        // Lifetime
         spellTimer += deltaSeconds;
         if (spellTimer >= spellDuration)
         {
@@ -108,7 +93,7 @@ public class TreeSpirit : Spell, IRenderable
             return;
         }
 
-        // Find nearest tree if no target
+        // Acquire a tree target
         if (currentTargetTile == null)
         {
             currentTargetTile = FindNearestTree();
@@ -117,7 +102,7 @@ public class TreeSpirit : Spell, IRenderable
 
         if (currentTargetTile != null)
         {
-            Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -hoverHeight);
+            Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -32f);
             Vector2 direction = targetWorld - axePosition;
 
             if (direction.LengthSquared() > 4f)
@@ -130,11 +115,11 @@ public class TreeSpirit : Spell, IRenderable
                 chopTimer += deltaSeconds;
                 if (chopTimer >= chopInterval)
                 {
-                    ChopTreeAt(currentTargetTile.Value);
+                    DoAxeSwingAt(currentTargetTile.Value);
                     chopTimer = 0f;
                 }
 
-                // Swing animation
+                // Swing anim
                 swingAngle += swingDirection * swingSpeed * deltaSeconds;
                 if (swingAngle > maxSwingAngle)
                 {
@@ -153,23 +138,6 @@ public class TreeSpirit : Spell, IRenderable
                     swingAngle = 0f;
                 }
             }
-
-            isReturning = false;
-        }
-        else
-        {
-            isReturning = true;
-        }
-
-        // Follow player
-        if (isReturning && owner != null)
-        {
-            Vector2 direction = owner.Position - axePosition;
-            if (direction.LengthSquared() > 4f)
-            {
-                direction.Normalize();
-                axePosition += direction * moveSpeed * deltaSeconds;
-            }
         }
     }
 
@@ -177,10 +145,8 @@ public class TreeSpirit : Spell, IRenderable
     {
         if (Game1.currentLocation == null) return null;
 
-        Vector2 axeTile = new((int)Math.Floor(axePosition.X / Game1.tileSize),
-                              (int)Math.Floor(axePosition.Y / Game1.tileSize));
-
-        double closestDist = double.MaxValue;
+        Vector2 axeTile = new((int)(axePosition.X / Game1.tileSize), (int)(axePosition.Y / Game1.tileSize));
+        double closest = double.MaxValue;
         Vector2? closestTile = null;
 
         foreach (var pair in Game1.currentLocation.terrainFeatures.Pairs)
@@ -188,9 +154,9 @@ public class TreeSpirit : Spell, IRenderable
             if (pair.Value is Tree tree && tree.growthStage.Value >= 5)
             {
                 double dist = Vector2.DistanceSquared(pair.Key, axeTile);
-                if (dist < closestDist)
+                if (dist < closest)
                 {
-                    closestDist = dist;
+                    closest = dist;
                     closestTile = pair.Key;
                 }
             }
@@ -199,114 +165,23 @@ public class TreeSpirit : Spell, IRenderable
         return closestTile;
     }
 
-    private void ChopTreeAt(Vector2 tile)
+    private void DoAxeSwingAt(Vector2 tile)
     {
-        if (Game1.currentLocation == null) return;
+        if (owner == null) return;
 
-        if (Game1.currentLocation.terrainFeatures.TryGetValue(tile, out var feature)
-            && feature is Tree tree)
-        {
-            try
-            {
-                tree.shake(tile, tree.growthStage.Value >= 5);
-                tree.health.Value -= chopDamage; // reduced damage
-                SpawnWoodChips(tile);
-                Game1.playSound("axchop");
-
-                if (tree.health.Value <= 0)
-                {
-                    Game1.currentLocation.terrainFeatures.Remove(tile);
-                    Game1.playSound("treethud");
-
-                    int woodAmount = 0;
-                    int woodIndex = 388;
-
-                    switch (tree.treeType.Value)
-                    {
-                        case Tree.bushyTree:
-                        case Tree.leafyTree:
-                        case Tree.pineTree:
-                            woodAmount = Game1.random.Next(5, 11);
-                            break;
-                        case Tree.palmTree:
-                            woodAmount = Game1.random.Next(3, 8);
-                            break;
-                        case Tree.mushroomTree:
-                            woodIndex = 420;
-                            woodAmount = Game1.random.Next(2, 5);
-                            break;
-                        case Tree.mahoganyTree:
-                            woodIndex = 709;
-                            woodAmount = Game1.random.Next(8, 12);
-                            break;
-                    }
-
-                    if (woodAmount > 0)
-                    {
-                        Game1.createMultipleObjectDebris(
-                            $"(O){woodIndex}",
-                            (int)tile.X,
-                            (int)tile.Y,
-                            woodAmount,
-                            Game1.currentLocation
-                        );
-                    }
-
-                    // Sap
-                    Game1.createDebris(92, (int)tile.X, (int)tile.Y, Game1.random.Next(1, 4), Game1.currentLocation);
-
-                    // Seeds (25% chance)
-                    int seedIndex = -1;
-                    switch (tree.treeType.Value)
-                    {
-                        case Tree.leafyTree: seedIndex = 309; break;
-                        case Tree.bushyTree: seedIndex = 310; break;
-                        case Tree.pineTree: seedIndex = 311; break;
-                        case Tree.mahoganyTree: seedIndex = 292; break;
-                    }
-
-                    if (seedIndex != -1 && Game1.random.NextDouble() < 0.25)
-                    {
-                        Game1.createDebris(seedIndex, (int)tile.X, (int)tile.Y, 1, Game1.currentLocation);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ModEntry.Instance.Monitor.Log($"Failed to chop tree at {tile}: {ex}", StardewModdingAPI.LogLevel.Warn);
-            }
-        }
-    }
-
-    private void SpawnWoodChips(Vector2 tile)
-    {
-        if (Game1.currentLocation == null) return;
-
-        int count = Game1.random.Next(3, 7);
-        for (int i = 0; i < count; i++)
-        {
-            var sprite = new TemporaryAnimatedSprite(
-                10,
-                tile * Game1.tileSize + new Vector2(Game1.random.Next(-16, 16), Game1.random.Next(-16, 16)),
-                Color.BurlyWood,
-                4,
-                false,
-                0.1f
-            );
-            sprite.scale = 1f;
-            sprite.layerDepth = 1f;
-            Game1.currentLocation.temporarySprites.Add(sprite);
-        }
+        Axe axe = new();
+        Vector2 pixelPos = tile * Game1.tileSize;
+        axe.DoFunction(Game1.currentLocation, (int)pixelPos.X, (int)pixelPos.Y, 1, owner);
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
     {
         if (!IsActive) return;
 
-        SpriteBatch spriteBatch = e.SpriteBatch;
+        SpriteBatch b = e.SpriteBatch;
         Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, axePosition);
 
-        spriteBatch.Draw(
+        b.Draw(
             axeTexture,
             screenPos,
             null,

@@ -14,17 +14,17 @@ public class EarthSpirit : Spell, IRenderable
 
     private bool subscribed = false;
     private Vector2 toolPosition;
-    private readonly float moveSpeed = 128f;
+    private readonly float moveSpeed = 256f;
 
     private float spellTimer = 0f;
-    private readonly float spellDuration = 10f;
+    private readonly float spellDuration = 20f;
     private readonly float hoverHeight = 32f;
 
     public bool IsActive { get; private set; }
 
     private Vector2? currentTargetTile = null;
     private float mineTimer = 0f;
-    private readonly float mineInterval = 0.5f;
+    private readonly float mineInterval = 0.8f;
 
     private float swingAngle = 0f;
     private float swingSpeed = 5f;
