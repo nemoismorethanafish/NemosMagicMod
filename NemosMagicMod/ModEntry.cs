@@ -7,12 +7,12 @@ using SpaceShared.APIs;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Menus;
 using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using static SpaceCore.Skills;
-using System.Reflection;
 
 namespace NemosMagicMod
 {
@@ -31,19 +31,20 @@ namespace NemosMagicMod
         public static int MagicLevel = 0;
 
         private ManaBar manaBar = null!;
-
         public static PlayerSaveData SaveData = new();
 
         // === Active Spell Tracking ===
         public static readonly List<Spell> ActiveSpells = new();
 
+        private bool queuedWizardUpgrade = false;
+        private Spellbook? queuedSpellbook = null;
+
         public override void Entry(IModHelper helper)
         {
             Instance = this;
 
+            // LevelUpChanges, mana bar, etc.
             new LevelUpChanges(helper, Monitor);
-
-            // Setup mana bar etc.
             ManaManager.SetMaxMana(100);
             ManaManager.Refill();
 
@@ -51,25 +52,52 @@ namespace NemosMagicMod
                 () => ManaManager.CurrentMana,
                 () => ManaManager.MaxMana,
                 10,
-                10);
+                10
+            );
             manaBar.SubscribeToEvents(helper);
 
             Spellbook.LoadIcon(helper);
             MagicSkillIcon = Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
 
+            // === Event subscriptions ===
+            helper.Events.Input.ButtonPressed += OnButtonPressed;
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
-            helper.Events.Input.ButtonPressed += OnButtonPressed;
             helper.Events.GameLoop.Saving += OnSaving;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            helper.Events.Display.MenuChanged += OnMenuChanged;
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
 
+        private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
+        {
+            if (!Context.IsPlayerFree)
+                return;
+
+            // Spell selection menu key
+            if (e.Button == SButton.D9)
+                Game1.activeClickableMenu = new SpellSelectionMenu(Helper, Monitor);
+        }
+        private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
+        {
+            if (e.NewMenu is DialogueBox dialogue
+                && Game1.currentSpeaker != null
+                && Game1.currentSpeaker.Name == "Wizard")
+            {
+                Spellbook? spellbook = Game1.player.Items.OfType<Spellbook>().FirstOrDefault();
+                if (spellbook != null)
+                {
+                    // Queue the upgrade, but do not open yet
+                    queuedWizardUpgrade = true;
+                    queuedSpellbook = spellbook;
+                }
+            }
+        }
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
-            var spaceCoreApi = Helper.ModRegistry.GetApi<ISpaceCoreApi>("spacechase0.SpaceCore");
+            spaceCoreApi = Helper.ModRegistry.GetApi<ISpaceCoreApi>("spacechase0.SpaceCore");
             if (spaceCoreApi == null)
             {
                 Monitor.Log("Could not get SpaceCore API. Is it installed correctly?", LogLevel.Error);
@@ -91,10 +119,7 @@ namespace NemosMagicMod
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            // Delay until the next tick to ensure all locations/buildings are loaded
             Helper.Events.GameLoop.UpdateTicked += GiveSpellbookOnceSafely;
-
-            // Schedule UpdateMagicLevel to run on next tick as well
             Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
         }
 
@@ -103,8 +128,7 @@ namespace NemosMagicMod
             Helper.Events.GameLoop.UpdateTicked -= GiveSpellbookOnceSafely;
 
             var player = Game1.player;
-            if (player == null)
-                return;
+            if (player == null) return;
 
             if (!PlayerHasSpellbookAnywhere(player))
             {
@@ -115,52 +139,29 @@ namespace NemosMagicMod
 
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
-            // 1️⃣ Check inventory
-            if (player.Items.Any(item => item is Spellbook))
-            {
-                Monitor.Log("📖 Spellbook found in player inventory.", LogLevel.Debug);
-                return true;
-            }
+            if (player.Items.Any(item => item is Spellbook)) return true;
 
-            // 2️⃣ Check all objects in all locations (including outdoor chests)
             foreach (GameLocation location in Game1.locations)
             {
-                if (LocationHasSpellbook(location))
-                {
-                    Monitor.Log($"📖 Spellbook found in location: {location.Name}.", LogLevel.Debug);
-                    return true;
-                }
+                if (LocationHasSpellbook(location)) return true;
 
-                // Check building interiors (barns, coops, sheds, etc.)
                 foreach (var building in location.buildings)
                 {
                     var interior = building.indoors.Value;
-                    if (interior != null && LocationHasSpellbook(interior))
-                    {
-                        Monitor.Log($"📖 Spellbook found inside building: {building.buildingType.Value} ({location.Name}).", LogLevel.Debug);
-                        return true;
-                    }
+                    if (interior != null && LocationHasSpellbook(interior)) return true;
                 }
             }
 
-            // 3️⃣ Check farmhouse fridge explicitly
             var farmhouse = Game1.getLocationFromName("FarmHouse") as StardewValley.Locations.FarmHouse;
             if (farmhouse != null)
             {
                 foreach (var obj in farmhouse.Objects.Values)
                 {
-                    if (obj is Chest chest && chest.fridge.Value)
-                    {
-                        if (chest.Items != null && chest.Items.Any(i => i is Spellbook))
-                        {
-                            Monitor.Log("📖 Spellbook found in farmhouse fridge.", LogLevel.Debug);
-                            return true;
-                        }
-                    }
+                    if (obj is Chest chest && chest.fridge.Value && chest.Items.Any(i => i is Spellbook))
+                        return true;
                 }
             }
 
-            Monitor.Log("❌ No Spellbook found anywhere.", LogLevel.Debug);
             return false;
         }
 
@@ -168,16 +169,11 @@ namespace NemosMagicMod
         {
             foreach (var obj in location.Objects.Values)
             {
-                if (obj is Chest chest)
-                {
-                    if (chest.Items != null && chest.Items.Any(i => i is Spellbook))
-                        return true;
-                }
+                if (obj is Chest chest && chest.Items.Any(i => i is Spellbook))
+                    return true;
             }
             return false;
         }
-
-
 
         private void OnSaving(object? sender, SavingEventArgs e)
         {
@@ -192,52 +188,46 @@ namespace NemosMagicMod
 
         private void UpdateMagicLevel()
         {
+            if (Game1.player == null) return;
+
             try
             {
-                if (Game1.player == null)
-                {
-                    Monitor.Log("Player is null, cannot update MagicLevel.", LogLevel.Warn);
-                    return;
-                }
-
                 MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
                 Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
             }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                Monitor.Log($"Caught ArgumentOutOfRangeException in UpdateMagicLevel: {ex.Message}", LogLevel.Error);
-            }
             catch (Exception ex)
             {
-                Monitor.Log($"Unexpected exception in UpdateMagicLevel: {ex}", LogLevel.Error);
+                Monitor.Log($"Error updating MagicLevel: {ex}", LogLevel.Error);
             }
         }
 
-        private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
-        {
-            if (!Context.IsPlayerFree)
-                return;
-
-            if (e.Button == SButton.D9)
-                Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper, this.Monitor);
-        }
-
-        // === Active Spell Management ===
         public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
             if (!Context.IsWorldReady)
                 return;
 
+            // Update active spells
             for (int i = ActiveSpells.Count - 1; i >= 0; i--)
             {
                 Spell spell = ActiveSpells[i];
                 spell.Update(Game1.currentGameTime, Game1.player);
-
                 if (!spell.IsActive)
                     ActiveSpells.RemoveAt(i);
             }
-        }
 
+            // Handle queued wizard upgrade dialogue
+            if (queuedWizardUpgrade)
+            {
+                if (!(Game1.activeClickableMenu is DialogueBox)) // Dialogue finished
+                {
+                    if (queuedSpellbook != null)
+                        SpellbookUpgradeSystem.OfferWizardUpgrade(Game1.player, queuedSpellbook, Monitor);
+
+                    queuedWizardUpgrade = false;
+                    queuedSpellbook = null;
+                }
+            }
+        }
         public static void RegisterActiveSpell(Spell spell)
         {
             ActiveSpells.Add(spell);
@@ -256,16 +246,10 @@ namespace NemosMagicMod
             try
             {
                 GameStateQuery.Register(queryKey, (args, ctx) =>
-                {
-                    return GameStateQuery.Helpers.PlayerSkillLevelImpl(args, ctx.Player, f => f.GetCustomSkillLevel(skill));
-                });
-
-                monitor.Log($"GameStateQuery '{queryKey}' registered.", LogLevel.Info);
+                    GameStateQuery.Helpers.PlayerSkillLevelImpl(args, ctx.Player, f => f.GetCustomSkillLevel(skill))
+                );
             }
-            catch (InvalidOperationException)
-            {
-                monitor.Log($"GameStateQuery '{queryKey}' already registered, skipping.", LogLevel.Trace);
-            }
+            catch (InvalidOperationException) { }
 
             monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
         }

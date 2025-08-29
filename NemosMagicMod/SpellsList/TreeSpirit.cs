@@ -32,6 +32,8 @@ public class TreeSpirit : Spell, IRenderable
     private int swingDirection = 1;
     private float maxSwingAngle = 0.5f;
 
+    private bool isReturning = false;
+
     public bool IsActive { get; private set; }
 
     public TreeSpirit()
@@ -66,6 +68,8 @@ public class TreeSpirit : Spell, IRenderable
         spellTimer = 0f;
         currentTargetTile = null;
         axePosition = who.Position + new Vector2(0, -64f);
+        isReturning = false;
+
 
         if (!subscribed)
         {
@@ -103,12 +107,24 @@ public class TreeSpirit : Spell, IRenderable
             chopTimer = 0f;
         }
 
+        if (currentTargetTile == null)
+        {
+            currentTargetTile = FindNearestTree();
+            chopTimer = 0f;
+
+            if (currentTargetTile == null)
+                isReturning = true; // start returning to player
+            else
+                isReturning = false;
+        }
+
         if (currentTargetTile != null)
         {
+            // move toward tree and chop (existing logic)
             Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -32f);
             Vector2 direction = targetWorld - axePosition;
 
-            if (direction.LengthSquared() > 4f)
+            if (direction.LengthSquared() > 8f)
             {
                 direction.Normalize();
                 axePosition += direction * moveSpeed * deltaSeconds;
@@ -122,19 +138,12 @@ public class TreeSpirit : Spell, IRenderable
                     chopTimer = 0f;
                 }
 
-                // Swing anim
+                // swing animation (existing logic)
                 swingAngle += swingDirection * swingSpeed * deltaSeconds;
-                if (swingAngle > maxSwingAngle)
-                {
-                    swingAngle = maxSwingAngle;
-                    swingDirection = -1;
-                }
-                else if (swingAngle < -maxSwingAngle)
-                {
-                    swingAngle = -maxSwingAngle;
-                    swingDirection = 1;
-                }
+                if (swingAngle > maxSwingAngle) { swingAngle = maxSwingAngle; swingDirection = -1; }
+                if (swingAngle < -maxSwingAngle) { swingAngle = -maxSwingAngle; swingDirection = 1; }
 
+                // if tree destroyed
                 if (!Game1.currentLocation.terrainFeatures.ContainsKey(currentTargetTile.Value))
                 {
                     currentTargetTile = null;
@@ -142,6 +151,23 @@ public class TreeSpirit : Spell, IRenderable
                 }
             }
         }
+        if (isReturning && owner != null)
+        {
+            Vector2 direction = owner.Position - axePosition;
+            const float returnThreshold = 4f;
+
+            if (direction.LengthSquared() > returnThreshold * returnThreshold)
+            {
+                direction.Normalize();
+                axePosition += direction * moveSpeed * deltaSeconds;
+            }
+            else
+            {
+                // Close enough to player, stop returning
+                isReturning = false;
+            }
+        }
+
     }
 
     private Vector2? FindNearestTree()
