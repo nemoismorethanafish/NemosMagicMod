@@ -119,63 +119,109 @@ namespace NemosMagicMod.Spells
             private readonly ClickableComponent cancelButton;
 
             public SpellbookUpgradeMenu(Farmer player, Spellbook spellbook, IMonitor monitor)
-                : base((Game1.uiViewport.Width - 400) / 2, (Game1.uiViewport.Height - 300) / 2, 400, 300, false)
+                : base((Game1.uiViewport.Width - 800) / 2, (Game1.uiViewport.Height - 576) / 2, 800, 576, false)
             {
                 this.spellbook = spellbook;
                 this.monitor = monitor;
 
                 int nextTierIndex = (int)spellbook.Tier;
-                goldCost = GoldCostPerTier[nextTierIndex];
-                requiredMaterials = MaterialCostPerTier[nextTierIndex].ToList();
+                goldCost = SpellbookUpgradeSystem.GoldCostPerTier[nextTierIndex];
+                requiredMaterials = SpellbookUpgradeSystem.MaterialCostPerTier[nextTierIndex].ToList();
 
-                upgradeButton = new ClickableComponent(new Rectangle(xPositionOnScreen + 50, yPositionOnScreen + height - 60, 120, 40), "Upgrade");
-                cancelButton = new ClickableComponent(new Rectangle(xPositionOnScreen + width - 170, yPositionOnScreen + height - 60, 120, 40), "Cancel");
+                upgradeButton = new ClickableComponent(
+                    new Rectangle(xPositionOnScreen + 100, yPositionOnScreen + height - 100, 180, 50),
+                    "Upgrade"
+                );
+                cancelButton = new ClickableComponent(
+                    new Rectangle(xPositionOnScreen + width - 280, yPositionOnScreen + height - 100, 180, 50),
+                    "Cancel"
+                );
             }
 
             public override void draw(SpriteBatch b)
             {
-                // --- Draw main menu box with tan background ---
-                Color menuColor = new Color(245, 235, 190); // soft tan / parchment color
+                // Draw main menu box like inventory
                 IClickableMenu.drawTextureBox(
                     b,
                     Game1.menuTexture,
-                    new Rectangle(0, 0, 16, 16),
+                    new Rectangle(0, 256, 60, 60),
                     xPositionOnScreen,
                     yPositionOnScreen,
                     width,
                     height,
-                    menuColor
+                    Color.White,
+                    1f,
+                    true
                 );
 
-                // Draw title
-                SpriteText.drawString(b, $"Upgrade Spellbook: {spellbook.Tier}", xPositionOnScreen + 20, yPositionOnScreen + 20);
+                // Title
+                SpriteText.drawString(b, $"Upgrade Spellbook: {spellbook.Tier}", xPositionOnScreen + 40, yPositionOnScreen + 40);
 
-                // Draw gold requirement
-                SpriteText.drawString(b, $"Gold: {goldCost}", xPositionOnScreen + 20, yPositionOnScreen + 60);
+                // Gold requirement
+                SpriteText.drawString(b, $"Gold: {goldCost}", xPositionOnScreen + 40, yPositionOnScreen + 100);
 
-                // Draw required materials
-                int offsetY = 100;
+                // Materials list
+                int offsetY = yPositionOnScreen + 160;
                 foreach (var (name, count) in requiredMaterials)
                 {
                     int playerCount = Game1.player.Items
                         .Where(i => i != null && i.Name == name)
                         .Sum(i => i.Stack);
 
-                    SpriteText.drawString(b, $"{name}: {playerCount}/{count}", xPositionOnScreen + 20, yPositionOnScreen + offsetY);
-                    offsetY += 30;
+                    var obj = new StardewValley.Object(name, 1, false, 0, 0);
+                    obj.drawInMenu(
+                        b,
+                        new Vector2(xPositionOnScreen + 40, offsetY),
+                        1f, 1f, 1f,
+                        StackDrawType.Hide,
+                        Color.White,
+                        false
+                    );
+
+                    SpriteText.drawString(
+                        b,
+                        $"{name}: {playerCount}/{count}",
+                        xPositionOnScreen + 90,
+                        offsetY + 20
+                    );
+
+                    offsetY += 80; // more spacing for larger menu
                 }
 
-                // Draw buttons with default menu texture
-                IClickableMenu.drawTextureBox(b, Game1.menuTexture, new Rectangle(0, 0, 16, 16), upgradeButton.bounds.X, upgradeButton.bounds.Y, upgradeButton.bounds.Width, upgradeButton.bounds.Height, Color.White);
-                IClickableMenu.drawTextureBox(b, Game1.menuTexture, new Rectangle(0, 0, 16, 16), cancelButton.bounds.X, cancelButton.bounds.Y, cancelButton.bounds.Width, cancelButton.bounds.Height, Color.White);
+                // Draw buttons
+                IClickableMenu.drawTextureBox(
+                    b,
+                    Game1.menuTexture,
+                    new Rectangle(0, 256, 60, 60),
+                    upgradeButton.bounds.X,
+                    upgradeButton.bounds.Y,
+                    upgradeButton.bounds.Width,
+                    upgradeButton.bounds.Height,
+                    Color.White,
+                    1f,
+                    true
+                );
+                IClickableMenu.drawTextureBox(
+                    b,
+                    Game1.menuTexture,
+                    new Rectangle(0, 256, 60, 60),
+                    cancelButton.bounds.X,
+                    cancelButton.bounds.Y,
+                    cancelButton.bounds.Width,
+                    cancelButton.bounds.Height,
+                    Color.White,
+                    1f,
+                    true
+                );
 
-                SpriteText.drawString(b, "Upgrade", upgradeButton.bounds.X + 20, upgradeButton.bounds.Y + 10);
-                SpriteText.drawString(b, "Cancel", cancelButton.bounds.X + 20, cancelButton.bounds.Y + 10);
+                SpriteText.drawString(b, "Upgrade", upgradeButton.bounds.X + 30, upgradeButton.bounds.Y + 15);
+                SpriteText.drawString(b, "Cancel", cancelButton.bounds.X + 30, cancelButton.bounds.Y + 15);
 
                 base.draw(b);
                 Game1.mouseCursorTransparency = 1f;
                 drawMouse(b);
             }
+
 
             public override void receiveLeftClick(int x, int y, bool playSound = true)
             {

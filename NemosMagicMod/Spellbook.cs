@@ -12,12 +12,17 @@ using System.Xml.Serialization;
 [XmlType("Mods_NemosMagicMod_Spellbook")]
 public class Spellbook : Tool
 {
-    public SpellbookTier Tier { get; set; } = SpellbookTier.Novice;
-
-    public Spellbook() : base("Spellbook", 0, 0, 0, false)
+    public SpellbookTier Tier
     {
-        UpgradeLevel = 0;
+        get => tier;
+        set
+        {
+            tier = value;
+            UpgradeLevel = (int)tier; // sync vanilla property
+        }
     }
+    private SpellbookTier tier = SpellbookTier.Novice;
+
 
     public static Texture2D? SpellbookTexture;
 
@@ -26,9 +31,19 @@ public class Spellbook : Tool
         SpellbookTexture = helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
     }
 
-    public override string getDescription() => "A book filled with arcane knowledge.";
     public override string getCategoryName() => "Magic";
-    public override string DisplayName => "Spellbook";
+    public override string DisplayName => $"Spellbook ({Tier})";
+
+    public override string getDescription()
+    {
+        return Tier switch
+        {
+            SpellbookTier.Novice => "A simple tome containing the most basic arcane knowledge.",
+            SpellbookTier.Adept => "An upgraded tome, brimming with stronger magical energy.",
+            SpellbookTier.Master => "A powerful spellbook infused with deep magical secrets.",
+            _ => "A mysterious spellbook."
+        };
+    }
     public override bool canBeTrashed() => false;
     public override bool canBeShipped() => false;
     public override bool canStackWith(ISalable other) => false;

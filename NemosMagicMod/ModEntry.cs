@@ -89,6 +89,22 @@ namespace NemosMagicMod
                 return;
             }
 
+            // --- Debug: Open SpellbookUpgradeMenu with key 0 ---
+            if (e.Button == SButton.D0)
+            {
+                Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
+                if (spellbook != null)
+                {
+                    Game1.activeClickableMenu = new SpellbookUpgradeMenu(player, spellbook, Monitor);
+                }
+                else
+                {
+                    Game1.showRedMessage("No Spellbook found in inventory!");
+                }
+                return;
+            }
+
+
             // --- Hardcoded right-click to trigger wizard interaction ---
             if (e.Button == SButton.MouseRight)
             {
@@ -108,7 +124,6 @@ namespace NemosMagicMod
                             facingTile
                         ) < 1f
                     );
-
 
                 if (wizard != null)
                 {

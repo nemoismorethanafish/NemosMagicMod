@@ -50,7 +50,18 @@ public class SpellSelectionMenu : IClickableMenu
         RefreshSpellList();
 
         // Draw menu background
-        b.Draw(Game1.staminaRect, new Rectangle(xPositionOnScreen, yPositionOnScreen, width, height), new Color(240, 230, 180));
+        IClickableMenu.drawTextureBox(
+            b,
+            Game1.menuTexture,
+            new Rectangle(0, 256, 60, 60), // standard menu background slice
+            xPositionOnScreen,
+            yPositionOnScreen,
+            width,
+            height,
+            Color.White,
+            1f,
+            true
+        );
 
         // Draw title
         SpriteFont font = Game1.dialogueFont;
@@ -73,9 +84,9 @@ public class SpellSelectionMenu : IClickableMenu
             int row = i % maxPerColumn;
 
             Vector2 pos = new Vector2(
-                xPositionOnScreen + 30 + column * (width / 2),
-                yPositionOnScreen + 60 + row * spellSpacing
-            );
+               xPositionOnScreen + 30 + column * (width / 2),
+               yPositionOnScreen + 90 + row * spellSpacing
+           );
 
             Rectangle spellBorder = new Rectangle((int)pos.X - 10, (int)pos.Y - 5, columnWidth, 35);
 
@@ -119,7 +130,7 @@ public class SpellSelectionMenu : IClickableMenu
 
             Rectangle spellBorder = new Rectangle(
                 xPositionOnScreen + 30 + column * (width / 2) - 10,
-                yPositionOnScreen + 60 + row * spellSpacing - 5,
+                yPositionOnScreen + 90 + row * spellSpacing - 5,
                 columnWidth,
                 35
             );
