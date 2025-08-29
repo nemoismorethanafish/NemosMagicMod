@@ -12,6 +12,7 @@ using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static NemosMagicMod.Spells.SpellbookUpgradeSystem;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
@@ -67,6 +68,7 @@ namespace NemosMagicMod
             helper.Events.GameLoop.Saving += OnSaving;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Display.MenuChanged += OnMenuChanged;
+
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
@@ -206,25 +208,43 @@ namespace NemosMagicMod
             if (!Context.IsWorldReady)
                 return;
 
-            // Update active spells
+            // --- Update active spells ---
             for (int i = ActiveSpells.Count - 1; i >= 0; i--)
             {
                 Spell spell = ActiveSpells[i];
                 spell.Update(Game1.currentGameTime, Game1.player);
                 if (!spell.IsActive)
+                {
+                    Monitor.Log($"Removing inactive spell: {spell.Name}", LogLevel.Trace);
                     ActiveSpells.RemoveAt(i);
+                }
             }
 
-            // Handle queued wizard upgrade dialogue
+            // --- Detect wizard dialogue and queue upgrade ---
+            if (!queuedWizardUpgrade && Game1.dialogueUp && Game1.currentSpeaker != null && Game1.currentSpeaker.Name == "Wizard")
+            {
+                Spellbook? spellbook = Game1.player.Items.OfType<Spellbook>().FirstOrDefault();
+                if (spellbook != null)
+                {
+                    queuedWizardUpgrade = true;
+                    queuedSpellbook = spellbook;
+                    Monitor.Log("Wizard dialogue detected! Spellbook upgrade queued.", LogLevel.Info);
+                }
+            }
+
+            // --- Handle queued wizard upgrade ---
             if (queuedWizardUpgrade)
             {
-                if (!(Game1.activeClickableMenu is DialogueBox)) // Dialogue finished
+                if (!Game1.dialogueUp && queuedSpellbook != null)
                 {
-                    if (queuedSpellbook != null)
-                        SpellbookUpgradeSystem.OfferWizardUpgrade(Game1.player, queuedSpellbook, Monitor);
-
+                    Monitor.Log("Offering Spellbook upgrade dialogue now.", LogLevel.Info);
+                    SpellbookUpgradeSystem.OfferWizardUpgrade(Game1.player, queuedSpellbook, Monitor);
                     queuedWizardUpgrade = false;
                     queuedSpellbook = null;
+                }
+                else
+                {
+                    Monitor.Log("Waiting for dialogue to finish before showing upgrade menu.", LogLevel.Trace);
                 }
             }
         }
