@@ -14,6 +14,8 @@ using System.Collections.Generic;
 using System.Linq;
 using static NemosMagicMod.Spells.SpellbookUpgradeSystem;
 using static SpaceCore.Skills;
+using Microsoft.Xna.Framework;
+
 
 namespace NemosMagicMod
 {
@@ -78,24 +80,48 @@ namespace NemosMagicMod
             if (!Context.IsPlayerFree)
                 return;
 
+            var player = Game1.player;
+
             // Spell selection menu key
             if (e.Button == SButton.D9)
+            {
                 Game1.activeClickableMenu = new SpellSelectionMenu(Helper, Monitor);
+                return;
+            }
+
+            // --- Hardcoded right-click to trigger wizard interaction ---
+            if (e.Button == SButton.MouseRight)
+            {
+                // Compute the tile the player is facing
+                Vector2 playerTile = new Vector2((int)(player.Position.X / Game1.tileSize), (int)(player.Position.Y / Game1.tileSize));
+                Vector2 facingTile = playerTile + new Vector2(
+                    player.FacingDirection == 1 ? 1 : player.FacingDirection == 3 ? -1 : 0,
+                    player.FacingDirection == 0 ? -1 : player.FacingDirection == 2 ? 1 : 0
+                );
+
+                // Find Wizard at that tile
+                NPC wizard = Game1.currentLocation.characters
+                    .FirstOrDefault(n =>
+                        n.Name == "Wizard" &&
+                        Vector2.Distance(
+                            new Vector2((int)(n.Position.X / Game1.tileSize), (int)(n.Position.Y / Game1.tileSize)),
+                            facingTile
+                        ) < 1f
+                    );
+
+
+                if (wizard != null)
+                {
+                    Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
+                    if (spellbook != null)
+                        SpellbookUpgradeSystem.OfferWizardUpgrade(player, spellbook, Monitor);
+                    else
+                        Game1.showRedMessage("You don't have a Spellbook!");
+                }
+            }
         }
         private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
         {
-            if (e.NewMenu is DialogueBox dialogue
-                && Game1.currentSpeaker != null
-                && Game1.currentSpeaker.Name == "Wizard")
-            {
-                Spellbook? spellbook = Game1.player.Items.OfType<Spellbook>().FirstOrDefault();
-                if (spellbook != null)
-                {
-                    // Queue the upgrade, but do not open yet
-                    queuedWizardUpgrade = true;
-                    queuedSpellbook = spellbook;
-                }
-            }
         }
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
@@ -217,34 +243,6 @@ namespace NemosMagicMod
                 {
                     Monitor.Log($"Removing inactive spell: {spell.Name}", LogLevel.Trace);
                     ActiveSpells.RemoveAt(i);
-                }
-            }
-
-            // --- Detect wizard dialogue and queue upgrade ---
-            if (!queuedWizardUpgrade && Game1.dialogueUp && Game1.currentSpeaker != null && Game1.currentSpeaker.Name == "Wizard")
-            {
-                Spellbook? spellbook = Game1.player.Items.OfType<Spellbook>().FirstOrDefault();
-                if (spellbook != null)
-                {
-                    queuedWizardUpgrade = true;
-                    queuedSpellbook = spellbook;
-                    Monitor.Log("Wizard dialogue detected! Spellbook upgrade queued.", LogLevel.Info);
-                }
-            }
-
-            // --- Handle queued wizard upgrade ---
-            if (queuedWizardUpgrade)
-            {
-                if (!Game1.dialogueUp && queuedSpellbook != null)
-                {
-                    Monitor.Log("Offering Spellbook upgrade dialogue now.", LogLevel.Info);
-                    SpellbookUpgradeSystem.OfferWizardUpgrade(Game1.player, queuedSpellbook, Monitor);
-                    queuedWizardUpgrade = false;
-                    queuedSpellbook = null;
-                }
-                else
-                {
-                    Monitor.Log("Waiting for dialogue to finish before showing upgrade menu.", LogLevel.Trace);
                 }
             }
         }

@@ -24,10 +24,6 @@ namespace NemosMagicMod.Spells
     // --- Upgrade System ---
     public static class SpellbookUpgradeSystem
     {
-        public static bool QueueUpgradeMenu = false;
-        public static Farmer? QueuedPlayer = null;
-        public static Spellbook? QueuedSpellbook = null;
-        public static IMonitor? QueuedMonitor = null;
         // Costs per tier
         public static readonly int[] GoldCostPerTier = { 1000, 2500, 5000 };
         public static readonly (string name, int count)[][] MaterialCostPerTier =
