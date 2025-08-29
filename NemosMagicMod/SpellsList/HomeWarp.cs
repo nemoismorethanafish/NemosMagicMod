@@ -28,6 +28,18 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
+            // Check if the player is already home BEFORE doing anything
+            GameLocation home = Game1.getLocationFromName(who.homeLocation.Value) ?? Game1.getFarm();
+            if (who.currentLocation == home)
+            {
+                ModEntry.Instance.Monitor.Log(
+                    "HomeWarp: Player is already in their home. Warp canceled.",
+                    LogLevel.Info
+                );
+                return; // Exit early, do NOT spend mana or schedule the warp
+            }
+
+            // Deduct mana and trigger base spell effects
             base.Cast(who);
 
             // Play teleport bubble animation locally
@@ -47,18 +59,6 @@ namespace NemosMagicMod.Spells
             }
 
             who.playNearbySoundAll("wand");
-
-            // Check if the player is already home BEFORE scheduling the warp
-            GameLocation home = Game1.getLocationFromName(who.homeLocation.Value) ?? Game1.getFarm();
-            if (who.currentLocation == home)
-            {
-                ModEntry.Instance.Monitor.Log(
-                    "HomeWarp: Player is already in their home. Warp canceled.",
-                    LogLevel.Info
-                );
-                return; // Exit early, do NOT schedule the warp
-            }
-
             Game1.displayFarmer = false;
             who.temporarilyInvincible = true;
             who.temporaryInvincibilityTimer = -2000;
