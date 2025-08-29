@@ -15,6 +15,8 @@ public static class SpellRegistry //List of all spells
 
     public static Spell SeaSpirit { get; } = new SeaSpirit();
     public static Spell TimeWarp { get; } = new TimeWarp();
+    public static Spell HomeWarp { get; } = new HomeWarp();
+
 
 
 
@@ -30,7 +32,8 @@ public static class SpellRegistry //List of all spells
         TreeSpirit,
         EarthSpirit,
         SeaSpirit,
-        TimeWarp
+        TimeWarp,
+        HomeWarp
     };
 
 
@@ -48,7 +51,8 @@ public static class SpellRegistry //List of all spells
 
                 spell.Id == "nemo.EarthSpirit" ||
                 spell.Id == "nemo.SeaSpirit" ||
-                spell.Id == "nemo.TimeWarp")
+                spell.Id == "nemo.TimeWarp" ||
+                spell.Id == "nemo.HomeWarp" )
             {
                 return true;
             }
