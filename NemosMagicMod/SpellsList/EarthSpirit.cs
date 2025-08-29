@@ -7,6 +7,10 @@ using StardewValley.Tools;
 using System;
 using static Spell;
 
+
+//Pickaxe got stuck hovering on a rock. Need to adjust 
+
+
 public class EarthSpirit : Spell, IRenderable
 {
     private Texture2D pickaxeTexture;
@@ -118,13 +122,15 @@ public class EarthSpirit : Spell, IRenderable
             Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -hoverHeight);
             Vector2 direction = targetWorld - toolPosition;
 
-            if (direction.LengthSquared() > 4f)
+            const float arrivalThreshold = 8f; // pixels
+            if (direction.LengthSquared() > arrivalThreshold * arrivalThreshold)
             {
                 direction.Normalize();
                 toolPosition += direction * moveSpeed * deltaSeconds;
             }
             else
             {
+                toolPosition = targetWorld;
                 mineTimer += deltaSeconds;
                 if (mineTimer >= mineInterval)
                 {

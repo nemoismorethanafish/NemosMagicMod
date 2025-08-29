@@ -175,8 +175,8 @@ namespace NemosMagicMod.Spells
                 (int)Math.Floor(cloudPosition.Y / Game1.tileSize)
             );
 
-            float closestDist = float.MaxValue;
-            Vector2? closestTile = null;
+            float closestScore = float.MaxValue; // lower score = more desirable
+            Vector2? bestTile = null;
 
             foreach (var kvp in Game1.currentLocation.terrainFeatures.Pairs)
             {
@@ -187,16 +187,35 @@ namespace NemosMagicMod.Spells
                         continue;
 
                     Vector2 tile = kvp.Key;
-                    float dist = Vector2.Distance(tile, cloudTile);
-                    if (dist < closestDist && dist <= seekRadius)
+                    Vector2 toTile = tile - cloudTile;
+                    float distance = toTile.Length();
+
+                    if (distance > seekRadius)
+                        continue;
+
+                    // Score based on distance and alignment with cloud velocity
+                    float directionScore = 0f;
+                    if (cloudVelocity.LengthSquared() > 0f)
                     {
-                        closestDist = dist;
-                        closestTile = tile;
+                        Vector2 dirNorm = Vector2.Normalize(cloudVelocity);
+                        Vector2 toTileNorm = Vector2.Normalize(toTile);
+                        float alignment = Vector2.Dot(dirNorm, toTileNorm); // 1 = perfectly aligned
+                        directionScore = distance * (1f - alignment); // smaller = better
+                    }
+                    else
+                    {
+                        directionScore = distance;
+                    }
+
+                    if (directionScore < closestScore)
+                    {
+                        closestScore = directionScore;
+                        bestTile = tile;
                     }
                 }
             }
 
-            return closestTile;
+            return bestTile;
         }
 
         private void WaterNearbyCrops()

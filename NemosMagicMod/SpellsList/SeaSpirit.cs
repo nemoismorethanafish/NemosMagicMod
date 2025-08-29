@@ -1,7 +1,7 @@
-﻿using Microsoft.Xna.Framework;
+﻿using HarmonyLib;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
-using SpaceCore;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -9,7 +9,6 @@ using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using static Spell;
 
@@ -17,20 +16,24 @@ namespace NemosMagicMod.Spells
 {
     public class SeaSpirit : Spell, IRenderable
     {
-        private const float BubbleDuration = 30f; // increased duration
-        private const int BubbleRadius = 5;
+        private const float BubbleDuration = 30f; // duration in seconds
+        private const int BubbleRadius = 5;       // radius in tiles
         private float bubbleTimer = 0f;
         private List<Vector2> bubbleTiles = new();
         private Texture2D bubbleTexture;
         private bool subscribedDraw = false;
+        private bool boostAppliedThisCast = false;
+        public static bool Active { get; private set; } = false;
+
 
         public IReadOnlyList<Vector2> BubbleTiles => bubbleTiles;
-        public bool IsActive => bubbleTimer > 0f && bubbleTiles.Count > 0;
+        public bool IsActive => bubbleTimer > 0f;
 
         public SeaSpirit()
-            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates nearby.", 25)
+            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 25)
         {
             bubbleTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/bubbles.png");
+            ApplyHarmonyPatches();
         }
 
         protected override bool FreezePlayerDuringCast => false;
@@ -39,10 +42,12 @@ namespace NemosMagicMod.Spells
         {
             base.Cast(who);
             bubbleTiles.Clear();
+            boostAppliedThisCast = false;
+
             GameLocation location = who.currentLocation;
+            Vector2 playerTile = new((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
 
-            Vector2 playerTile = new Vector2((int)(who.Position.X / 64f), (int)(who.Position.Y / 64f));
-
+            // Fill bubble tiles (visual only)
             for (int x = -BubbleRadius; x <= BubbleRadius; x++)
             {
                 for (int y = -BubbleRadius; y <= BubbleRadius; y++)
@@ -56,7 +61,8 @@ namespace NemosMagicMod.Spells
             bubbleTimer = BubbleDuration;
             SubscribeDraw();
 
-            Game1.showGlobalMessage($"Sea Spirit activated! Bubbles will boost fishing for {BubbleDuration} seconds.");
+            Game1.showGlobalMessage($"Sea Spirit activated! Fishing bite rate increased for {BubbleDuration} seconds.");
+            ModEntry.Instance.Monitor.Log("Sea Spirit spell cast!", LogLevel.Info);
         }
 
         public override void Update(GameTime gameTime, Farmer who)
@@ -65,7 +71,10 @@ namespace NemosMagicMod.Spells
             {
                 bubbleTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
                 if (bubbleTimer <= 0f)
+                {
                     Unsubscribe();
+                    ModEntry.Instance.Monitor.Log("Sea Spirit expired.", LogLevel.Info);
+                }
             }
         }
 
@@ -94,17 +103,46 @@ namespace NemosMagicMod.Spells
 
             foreach (var tile in bubbleTiles)
             {
-                Vector2 pixelPos = Game1.GlobalToLocal(Game1.viewport, tile * 64f);
-                e.SpriteBatch.Draw(bubbleTexture, pixelPos, null, Color.White * 0.8f, 0f, Vector2.Zero, 1f, SpriteEffects.None, 1f);
+                Vector2 pixelPos = Game1.GlobalToLocal(Game1.viewport, tile * Game1.tileSize);
+                e.SpriteBatch.Draw(
+                    bubbleTexture,
+                    pixelPos,
+                    null,
+                    Color.White * 0.8f,
+                    0f,
+                    Vector2.Zero,
+                    1f,
+                    SpriteEffects.None,
+                    1f
+                );
             }
         }
 
-        /// <summary>
-        /// Bite rate multiplier for a cast tile.
-        /// </summary>
-        public float GetFishingBiteMultiplier(Vector2 castTile)
+        private void ApplyHarmonyPatches()
         {
-            return (IsActive && bubbleTiles.Contains(castTile)) ? 3f : 1f; // +200%
+            var harmony = new Harmony("nemo.SeaSpiritFishingPatch");
+            harmony.Patch(
+                original: AccessTools.Method(typeof(FishingRod), nameof(FishingRod.DoFunction)),
+                postfix: new HarmonyMethod(typeof(SeaSpirit), nameof(FishingRod_DoFunction_Postfix))
+            );
+        }
+
+        // This postfix runs right after DoFunction, when the rod sets up fishing.
+        public static void FishingRod_DoFunction_Postfix(FishingRod __instance, GameLocation location, int x, int y, int power, Farmer who)
+        {
+            var seaSpirit = SpellRegistry.SeaSpirit;
+
+            if (seaSpirit.IsActive && __instance.isFishing && __instance.timeUntilFishingBite > 0)
+            {
+                int original = (int)__instance.timeUntilFishingBite;
+                int boosted = Math.Max(500, original / 3); // 3x faster
+                __instance.timeUntilFishingBite = boosted;
+
+                ModEntry.Instance.Monitor.Log(
+                    $"Sea Spirit applied! Original timer: {original}, boosted timer: {boosted}",
+                    LogLevel.Debug
+                );
+            }
         }
     }
 
@@ -113,51 +151,10 @@ namespace NemosMagicMod.Spells
         public static bool isOpenWater(this GameLocation loc, Vector2 tile)
         {
             if (!loc.isTileOnMap(tile)) return false;
-            if (loc.terrainFeatures.TryGetValue(tile, out TerrainFeature feature))
+            if (loc.terrainFeatures.TryGetValue(tile, out var feature))
                 if (feature is Flooring) return false;
 
             return loc.doesTileHaveProperty((int)tile.X, (int)tile.Y, "Water", "Back") != null;
-        }
-    }
-
-    public static class SeaSpiritFishingIntegration
-    {
-        private static readonly string SeaSpiritKey = "NemosMagicMod.SeaSpiritApplied";
-
-        public static void RegisterEvents(IModHelper helper)
-        {
-            helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
-        }
-
-        private static void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
-        {
-            Farmer who = Game1.player;
-            if (who == null || !who.UsingTool || !(who.CurrentTool is FishingRod rod))
-                return;
-
-            // Only while waiting for a bite
-            if (rod.inUse() && !rod.isFishing && rod.isCasting)
-            {
-                // Grab the field for bite timer
-                var field = typeof(FishingRod).GetField("timeUntilFishingBite",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-
-                if (field == null) return;
-
-                int currentTimer = (int)field.GetValue(rod);
-
-                // Where the bobber actually landed
-                Vector2 bobberTile = rod.bobber.Value / 64f;
-
-                if (SpellRegistry.SeaSpirit is SeaSpirit sea && sea.IsActive && sea.BubbleTiles.Contains(bobberTile))
-                {
-                    // Make fish bite 3x faster (reduce timer by 66%)
-                    int boostedTimer = Math.Max(500, (int)(currentTimer / 3f));
-
-                    if (boostedTimer < currentTimer)
-                        field.SetValue(rod, boostedTimer);
-                }
-            }
         }
     }
 }

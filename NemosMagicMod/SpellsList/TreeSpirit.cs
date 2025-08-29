@@ -8,6 +8,9 @@ using StardewValley.Tools;
 using System;
 using static Spell;
 
+
+//Currently spawning sprites at the farmer when the axe hits a tree
+
 public class TreeSpirit : Spell, IRenderable
 {
     private Texture2D axeTexture;

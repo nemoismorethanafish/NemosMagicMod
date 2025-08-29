@@ -39,8 +39,6 @@ namespace NemosMagicMod
         {
             Instance = this;
 
-            SeaSpiritFishingIntegration.RegisterEvents(this.Helper);
-
             new LevelUpChanges(helper, Monitor);
 
             // Setup mana bar etc.
