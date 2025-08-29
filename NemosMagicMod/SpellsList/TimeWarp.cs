@@ -11,12 +11,13 @@ namespace NemosMagicMod.Spells
         private const int RewindAmount = 100; // 10 minutes
         private const int EarliestTime = 600; // 6:00 AM
         private const int MinimumCastTime = 700; // must be at least 7:00 AM
+        private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
 
         public TimeWarp()
             : base(
                   id: "nemo.TimeWarp",
                   name: "Time Warp",
-                  description: "Bend time backwards by 10 minutes, never earlier than 6:00 AM.",
+                  description: "Bend time backwards by 1 hour, never earlier than 6:00 AM. Can only be cast once per day.",
                   manaCost: 15,
                   experienceGained: 25,
                   isActive: false)
@@ -25,6 +26,19 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // Generate unique day ID
+            int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
+
+            // Check once-per-day
+            if (who.modData.TryGetValue(LastCastKey, out string lastDayStr) && int.TryParse(lastDayStr, out int lastDay))
+            {
+                if (lastDay == todayId)
+                {
+                    Game1.showRedMessage("Time Warp can only be cast once per day!");
+                    return; // do NOT spend mana
+                }
+            }
+
             // Check mana
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
@@ -54,6 +68,9 @@ namespace NemosMagicMod.Spells
 
             // Spawn swirl particles
             AddSwirlEffect(who);
+
+            // Record last cast day
+            who.modData[LastCastKey] = todayId.ToString();
         }
 
         private void AddSwirlEffect(Farmer who)

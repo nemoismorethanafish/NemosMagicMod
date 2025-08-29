@@ -7,10 +7,12 @@ using SpaceShared.APIs;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using static SpaceCore.Skills;
+using System.Reflection;
 
 namespace NemosMagicMod
 {
@@ -59,7 +61,6 @@ namespace NemosMagicMod
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
             helper.Events.Input.ButtonPressed += OnButtonPressed;
-            helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.Saving += OnSaving;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
 
@@ -90,20 +91,93 @@ namespace NemosMagicMod
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
+            // Delay until the next tick to ensure all locations/buildings are loaded
+            Helper.Events.GameLoop.UpdateTicked += GiveSpellbookOnceSafely;
+
+            // Schedule UpdateMagicLevel to run on next tick as well
+            Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
+        }
+
+        private void GiveSpellbookOnceSafely(object? sender, UpdateTickedEventArgs e)
+        {
+            Helper.Events.GameLoop.UpdateTicked -= GiveSpellbookOnceSafely;
+
             var player = Game1.player;
-            if (player == null || player.Items == null)
+            if (player == null)
                 return;
 
-            bool hasSpellbook = player.Items.Any(item => item is Spellbook);
-            if (!hasSpellbook)
+            if (!PlayerHasSpellbookAnywhere(player))
             {
                 player.addItemToInventory(new Spellbook());
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
-
-            // Schedule UpdateMagicLevel to run on next tick to ensure SpaceCore is ready
-            Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
         }
+
+        private bool PlayerHasSpellbookAnywhere(Farmer player)
+        {
+            // 1️⃣ Check inventory
+            if (player.Items.Any(item => item is Spellbook))
+            {
+                Monitor.Log("📖 Spellbook found in player inventory.", LogLevel.Debug);
+                return true;
+            }
+
+            // 2️⃣ Check all objects in all locations (including outdoor chests)
+            foreach (GameLocation location in Game1.locations)
+            {
+                if (LocationHasSpellbook(location))
+                {
+                    Monitor.Log($"📖 Spellbook found in location: {location.Name}.", LogLevel.Debug);
+                    return true;
+                }
+
+                // Check building interiors (barns, coops, sheds, etc.)
+                foreach (var building in location.buildings)
+                {
+                    var interior = building.indoors.Value;
+                    if (interior != null && LocationHasSpellbook(interior))
+                    {
+                        Monitor.Log($"📖 Spellbook found inside building: {building.buildingType.Value} ({location.Name}).", LogLevel.Debug);
+                        return true;
+                    }
+                }
+            }
+
+            // 3️⃣ Check farmhouse fridge explicitly
+            var farmhouse = Game1.getLocationFromName("FarmHouse") as StardewValley.Locations.FarmHouse;
+            if (farmhouse != null)
+            {
+                foreach (var obj in farmhouse.Objects.Values)
+                {
+                    if (obj is Chest chest && chest.fridge.Value)
+                    {
+                        if (chest.Items != null && chest.Items.Any(i => i is Spellbook))
+                        {
+                            Monitor.Log("📖 Spellbook found in farmhouse fridge.", LogLevel.Debug);
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            Monitor.Log("❌ No Spellbook found anywhere.", LogLevel.Debug);
+            return false;
+        }
+
+        private bool LocationHasSpellbook(GameLocation location)
+        {
+            foreach (var obj in location.Objects.Values)
+            {
+                if (obj is Chest chest)
+                {
+                    if (chest.Items != null && chest.Items.Any(i => i is Spellbook))
+                        return true;
+                }
+            }
+            return false;
+        }
+
+
 
         private void OnSaving(object? sender, SavingEventArgs e)
         {
@@ -112,7 +186,6 @@ namespace NemosMagicMod
 
         private void RunUpdateMagicLevelOnce(object? sender, UpdateTickedEventArgs e)
         {
-            // Unsubscribe immediately so it only runs once
             Helper.Events.GameLoop.UpdateTicked -= RunUpdateMagicLevelOnce;
             UpdateMagicLevel();
         }
@@ -133,7 +206,6 @@ namespace NemosMagicMod
             catch (ArgumentOutOfRangeException ex)
             {
                 Monitor.Log($"Caught ArgumentOutOfRangeException in UpdateMagicLevel: {ex.Message}", LogLevel.Error);
-                // Could be SpaceCore skill list not ready yet, skip update this time
             }
             catch (Exception ex)
             {
@@ -147,9 +219,7 @@ namespace NemosMagicMod
                 return;
 
             if (e.Button == SButton.D9)
-            {
                 Game1.activeClickableMenu = new SpellSelectionMenu(this.Helper, this.Monitor);
-            }
         }
 
         // === Active Spell Management ===

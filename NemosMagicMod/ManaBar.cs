@@ -53,6 +53,9 @@ internal class ManaBar
             Game1.staminaRect,
             new Rectangle(X + 4, fillY, width - 8, fillHeight),
             Color.Blue);
+
+        // Draw tooltip on top if mouse is over
+        DrawTooltip(spriteBatch);
     }
 
     public void DrawTooltip(SpriteBatch spriteBatch)
@@ -62,10 +65,11 @@ internal class ManaBar
         if (rect.Contains(mouse))
         {
             string tooltip = $"Mana: {getCurrentMana()} / {getMaxMana()}";
-            IClickableMenu.drawHoverText(
-                spriteBatch, tooltip, Game1.smallFont);
+            // Draw on top of the bar
+            IClickableMenu.drawHoverText(spriteBatch, tooltip, Game1.smallFont);
         }
     }
+
     public void OnRenderingHud(object? sender, StardewModdingAPI.Events.RenderingHudEventArgs e)
     {
         ModEntry.Instance.Monitor.Log("Drawing mana bar...", LogLevel.Trace);
