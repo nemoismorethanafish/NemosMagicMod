@@ -69,41 +69,49 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // --- Not Enough Mana check ---
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
 
+            // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
-            bubbles.Clear();
 
-            GameLocation location = who.currentLocation;
-            Vector2 playerTile = new((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
-
-            List<Vector2> validTiles = new();
-            for (int x = -BubbleRadius; x <= BubbleRadius; x++)
+            // --- Delay the custom bubble effects ---
+            DelayedAction.functionAfterDelay(() =>
             {
-                for (int y = -BubbleRadius; y <= BubbleRadius; y++)
+                bubbles.Clear();
+
+                GameLocation location = who.currentLocation;
+                Vector2 playerTile = new((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
+
+                List<Vector2> validTiles = new();
+                for (int x = -BubbleRadius; x <= BubbleRadius; x++)
                 {
-                    Vector2 tile = playerTile + new Vector2(x, y);
-                    if (location.isTileOnMap(tile) && location.isOpenWater(tile))
-                        validTiles.Add(tile);
+                    for (int y = -BubbleRadius; y <= BubbleRadius; y++)
+                    {
+                        Vector2 tile = playerTile + new Vector2(x, y);
+                        if (location.isTileOnMap(tile) && location.isOpenWater(tile))
+                            validTiles.Add(tile);
+                    }
                 }
-            }
 
-            int numBubbles = 8; // number of simultaneous bubbles
-            if (validTiles.Count > 0)
-            {
-                Vector2 chosenTile = validTiles[Game1.random.Next(validTiles.Count)];
-                for (int i = 0; i < numBubbles; i++)
-                    bubbles.Add(new Bubble(chosenTile));
-            }
+                int numBubbles = 8; // number of simultaneous bubbles
+                if (validTiles.Count > 0)
+                {
+                    Vector2 chosenTile = validTiles[Game1.random.Next(validTiles.Count)];
+                    for (int i = 0; i < numBubbles; i++)
+                        bubbles.Add(new Bubble(chosenTile));
+                }
 
-            bubbleTimer = BubbleDuration;
-            SubscribeDraw();
+                bubbleTimer = BubbleDuration;
+                SubscribeDraw();
 
-            Game1.showGlobalMessage($"Sea Spirit activated! Fishing bite rate increased for {BubbleDuration} seconds.");
+                Game1.showGlobalMessage($"Sea Spirit activated! Fishing bite rate increased for {BubbleDuration} seconds.");
+
+            }, 1000); // 1-second delay
         }
 
         public override void Update(GameTime gameTime, Farmer who)

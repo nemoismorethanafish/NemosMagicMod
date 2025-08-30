@@ -23,7 +23,7 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            // Generate a simple unique ID for today
+            // Generate a unique ID for today
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
             // Check if already cast today
@@ -32,53 +32,61 @@ namespace NemosMagicMod.Spells
                 if (lastDay == todayId)
                 {
                     Game1.showRedMessage("Fertility Spirit can only be cast once per day!");
-                    return; // exit early, do NOT spend mana
+                    return;
                 }
             }
 
-            // Spend mana & activate spell
+            // --- Not Enough Mana check ---
+            if (who.Stamina < this.ManaCost) // or however your mod tracks mana
+            {
+                Game1.showRedMessage("Not enough mana!");
+                return;
+            }
+
+            // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
 
-            // Get player tile
-            Vector2 playerTile = new Vector2((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
-            GameLocation location = who.currentLocation;
+            // Record that spell was cast today immediately
+            who.modData[LastCastKey] = todayId.ToString();
 
-            // Apply growth in radius
-            for (int x = -GrowthRadius; x <= GrowthRadius; x++)
+            // --- Delayed custom effects ---
+            DelayedAction.functionAfterDelay(() =>
             {
-                for (int y = -GrowthRadius; y <= GrowthRadius; y++)
+                Vector2 playerTile = new Vector2((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
+                GameLocation location = who.currentLocation;
+
+                for (int x = -GrowthRadius; x <= GrowthRadius; x++)
                 {
-                    Vector2 tile = playerTile + new Vector2(x, y);
-
-                    if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature feature) && feature is HoeDirt dirt && dirt.crop != null)
+                    for (int y = -GrowthRadius; y <= GrowthRadius; y++)
                     {
-                        var crop = dirt.crop;
-                        if (crop.currentPhase.Value < crop.phaseDays.Count - 1)
-                        {
-                            crop.currentPhase.Value++;
+                        Vector2 tile = playerTile + new Vector2(x, y);
 
-                            // Spawn magical sparkles
-                            for (int i = 0; i < ParticleCount; i++)
+                        if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature feature) && feature is HoeDirt dirt && dirt.crop != null)
+                        {
+                            var crop = dirt.crop;
+                            if (crop.currentPhase.Value < crop.phaseDays.Count - 1)
                             {
-                                location.temporarySprites.Add(new TemporaryAnimatedSprite(
-                                    17,
-                                    tile * Game1.tileSize + new Vector2(Game1.random.Next(-16, 16), Game1.random.Next(-16, 16)),
-                                    Color.LimeGreen,
-                                    8,
-                                    false,
-                                    50f
-                                ));
+                                crop.currentPhase.Value++;
+
+                                for (int i = 0; i < ParticleCount; i++)
+                                {
+                                    location.temporarySprites.Add(new TemporaryAnimatedSprite(
+                                        17,
+                                        tile * Game1.tileSize + new Vector2(Game1.random.Next(-16, 16), Game1.random.Next(-16, 16)),
+                                        Color.LimeGreen,
+                                        8,
+                                        false,
+                                        50f
+                                    ));
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Play magical growth sound
-            Game1.playSound("yoba");
+                Game1.playSound("yoba");
 
-            // Record that spell was cast today
-            who.modData[LastCastKey] = todayId.ToString();
+            }, 1000); // 1-second delay
         }
 
         public override void Update(GameTime gameTime, Farmer who) { }

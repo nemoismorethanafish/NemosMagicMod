@@ -29,48 +29,54 @@ namespace NemosMagicMod.Spells
             // Generate unique day ID
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
-            // Check once-per-day
+            // --- Once-per-day check ---
             if (who.modData.TryGetValue(LastCastKey, out string lastDayStr) && int.TryParse(lastDayStr, out int lastDay))
             {
                 if (lastDay == todayId)
                 {
                     Game1.showRedMessage("Time Warp can only be cast once per day!");
-                    return; // do NOT spend mana
+                    return;
                 }
             }
 
-            // Check mana
+            // --- Not Enough Mana check ---
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
 
+            // --- Too early check ---
             if (Game1.timeOfDay < MinimumCastTime)
             {
                 Game1.showRedMessage("It's too early to warp time!");
                 return;
             }
 
-            // Spend mana and grant XP
+            // --- Spend mana and grant XP immediately ---
             ManaManager.SpendMana(ManaCost);
             base.GrantExperience(who);
 
-            // Rewind time
-            Game1.timeOfDay -= RewindAmount;
-            if (Game1.timeOfDay < EarliestTime)
-                Game1.timeOfDay = EarliestTime;
+            // --- Delay the actual time rewind and effects by 1 second ---
+            DelayedAction.functionAfterDelay(() =>
+            {
+                // Rewind time
+                Game1.timeOfDay -= RewindAmount;
+                if (Game1.timeOfDay < EarliestTime)
+                    Game1.timeOfDay = EarliestTime;
 
-            // Flash + sound
-            Game1.flashAlpha = 1f;
-            Game1.playSound("wand");
-            Game1.activeClickableMenu = null;
+                // Flash + sound
+                Game1.flashAlpha = 1f;
+                Game1.playSound("wand");
+                Game1.activeClickableMenu = null;
 
-            // Spawn swirl particles
-            AddSwirlEffect(who);
+                // Swirl particle effects
+                AddSwirlEffect(who);
 
-            // Record last cast day
-            who.modData[LastCastKey] = todayId.ToString();
+                // Record last cast day
+                who.modData[LastCastKey] = todayId.ToString();
+
+            }, 1000); // 1 second delay
         }
 
         private void AddSwirlEffect(Farmer who)

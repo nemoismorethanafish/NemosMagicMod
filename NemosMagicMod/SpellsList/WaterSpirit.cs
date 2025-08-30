@@ -58,49 +58,56 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // --- Not Enough Mana check ---
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
 
+            // --- Spend mana / base cast immediately ---
             base.Cast(who);
 
-            // Clear other active spells
-            foreach (var spell in ModEntry.ActiveSpells)
+            // --- Delay the actual cloud summoning and watering logic ---
+            DelayedAction.functionAfterDelay(() =>
             {
-                if (spell is IRenderable renderable)
-                    renderable.Unsubscribe();
+                // Clear other active spells
+                foreach (var spell in ModEntry.ActiveSpells)
+                {
+                    if (spell is IRenderable renderable)
+                        renderable.Unsubscribe();
 
-                spell.IsActive = false;
-            }
+                    spell.IsActive = false;
+                }
 
-            IsActive = true;
-            spellTimer = 0f;
-            wateringTimer = 0f;
-            activeSplashes.Clear();
-            targetTile = null;
+                IsActive = true;
+                spellTimer = 0f;
+                wateringTimer = 0f;
+                activeSplashes.Clear();
+                targetTile = null;
 
-            cloudPosition = who.Position + new Vector2(0, -64f);
+                cloudPosition = who.Position + new Vector2(0, -64f);
 
-            // Initial fallback velocity based on facing
-            switch (who.FacingDirection)
-            {
-                case 0: cloudVelocity = new Vector2(0, -cloudSpeed); break;
-                case 1: cloudVelocity = new Vector2(cloudSpeed, 0); break;
-                case 2: cloudVelocity = new Vector2(0, cloudSpeed); break;
-                case 3: cloudVelocity = new Vector2(-cloudSpeed, 0); break;
-                default: cloudVelocity = Vector2.Zero; break;
-            }
+                // Initial fallback velocity based on facing
+                switch (who.FacingDirection)
+                {
+                    case 0: cloudVelocity = new Vector2(0, -cloudSpeed); break;
+                    case 1: cloudVelocity = new Vector2(cloudSpeed, 0); break;
+                    case 2: cloudVelocity = new Vector2(0, cloudSpeed); break;
+                    case 3: cloudVelocity = new Vector2(-cloudSpeed, 0); break;
+                    default: cloudVelocity = Vector2.Zero; break;
+                }
 
-            if (!subscribed)
-            {
-                ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
-                ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
-                subscribed = true;
-            }
+                if (!subscribed)
+                {
+                    ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+                    ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+                    subscribed = true;
+                }
 
-            Game1.playSound("wateringCan");
+                Game1.playSound("wateringCan");
+
+            }, 1000); // 1-second delay
         }
 
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)

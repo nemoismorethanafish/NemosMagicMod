@@ -55,30 +55,36 @@ public class TreeSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
+        // --- Not Enough Mana check ---
         if (!ManaManager.HasEnoughMana(ManaCost))
         {
             Game1.showRedMessage("Not enough mana!");
             return;
         }
 
+        // --- Spend mana / base cast immediately ---
         base.Cast(who);
 
-        owner = who;
-        IsActive = true;
-        spellTimer = 0f;
-        currentTargetTile = null;
-        axePosition = who.Position + new Vector2(0, -64f);
-        isReturning = false;
-
-
-        if (!subscribed)
+        // --- Delay the summoning of the magical axe ---
+        DelayedAction.functionAfterDelay(() =>
         {
-            ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
-            ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
-            subscribed = true;
-        }
+            owner = who;
+            IsActive = true;
+            spellTimer = 0f;
+            currentTargetTile = null;
+            axePosition = who.Position + new Vector2(0, -64f);
+            isReturning = false;
 
-        Game1.playSound("axe");
+            if (!subscribed)
+            {
+                ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+                ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+                subscribed = true;
+            }
+
+            Game1.playSound("axe");
+
+        }, 1000); // 1-second delay
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)

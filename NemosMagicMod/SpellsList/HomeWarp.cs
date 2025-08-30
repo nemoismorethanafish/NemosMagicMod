@@ -22,13 +22,14 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // --- Not Enough Mana check ---
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
 
-            // Check if the player is already home BEFORE doing anything
+            // Check if already home BEFORE spending mana
             GameLocation home = Game1.getLocationFromName(who.homeLocation.Value) ?? Game1.getFarm();
             if (who.currentLocation == home)
             {
@@ -36,13 +37,13 @@ namespace NemosMagicMod.Spells
                     "HomeWarp: Player is already in their home. Warp canceled.",
                     LogLevel.Info
                 );
-                return; // Exit early, do NOT spend mana or schedule the warp
+                return; // Exit early
             }
 
-            // Deduct mana and trigger base spell effects
+            // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
 
-            // Play teleport bubble animation locally
+            // Play teleport bubble animation immediately
             for (int i = 0; i < 12; i++)
             {
                 who.currentLocation.temporarySprites.Add(
@@ -65,7 +66,11 @@ namespace NemosMagicMod.Spells
             who.freezePause = 1000;
             Game1.flashAlpha = 1f;
 
-            DelayedAction.fadeAfterDelay(() => WarpToHome(who), FadeDuration);
+            // --- Delay actual warp by 1 second (1000ms) ---
+            DelayedAction.functionAfterDelay(() =>
+            {
+                WarpToHome(who);
+            }, 1000);
         }
 
         private void WarpToHome(Farmer who)
