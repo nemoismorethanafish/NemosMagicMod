@@ -72,20 +72,12 @@ public abstract class Spell
             // Use the book reading animation instead of spellbook
             TriggerBookReadingAnimation(who);
         }
-        else
-        {
-            // Use original spellbook animation
-            StartSpellbookAnimation(who);
-        }
-
-        // Play casting sound
-        Game1.playSound("wand");
     }
 
     /// <summary>
     /// NEW: Triggers the book reading animation using your CustomBook
     /// </summary>
-    private void TriggerBookReadingAnimation(Farmer who)
+    public virtual void TriggerBookReadingAnimation(Farmer who)
     {
         if (FreezePlayerDuringCast)
             who.canMove = false;
@@ -120,25 +112,6 @@ public abstract class Spell
             DelayedAction.functionAfterDelay(() => who.canMove = true, 1000); // 1 second delay
         }
     }
-
-    /// <summary>
-    /// Original spellbook animation (renamed for clarity)
-    /// </summary>
-    private void StartSpellbookAnimation(Farmer who)
-    {
-        // Start spellbook animation
-        spellbookTimer = SpellbookDuration;
-
-        if (FreezePlayerDuringCast)
-            who.canMove = false;
-
-        // **Force Farmer to reading frame**
-        TriggerReadingFrame(who);
-
-        // Subscribe to rendering & update events
-        SubscribeDraw();
-    }
-
     /// <summary>Force the farmer sprite to frame 57 temporarily.</summary>
     protected void TriggerReadingFrame(Farmer who)
     {
