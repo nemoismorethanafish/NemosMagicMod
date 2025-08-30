@@ -330,6 +330,10 @@ namespace NemosMagicMod.Spells
 
                 // Upgrade tier
                 spellbook.Tier++;
+
+                // Update the spellbook's appearance to match new tier
+                spellbook.UpdateTierAppearance();
+
                 Game1.showGlobalMessage($"Your Spellbook has been upgraded to {spellbook.Tier}!");
                 monitor.Log($"Spellbook upgraded to {spellbook.Tier}", LogLevel.Info);
 
@@ -337,4 +341,5 @@ namespace NemosMagicMod.Spells
             }
         }
     }
+
 }

@@ -16,7 +16,6 @@ using static NemosMagicMod.Spells.SpellbookUpgradeSystem;
 using static SpaceCore.Skills;
 using Microsoft.Xna.Framework;
 
-
 namespace NemosMagicMod
 {
     public interface ISpaceCoreApi
@@ -70,7 +69,6 @@ namespace NemosMagicMod
             helper.Events.GameLoop.Saving += OnSaving;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Display.MenuChanged += OnMenuChanged;
-
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
         }
@@ -139,16 +137,15 @@ namespace NemosMagicMod
                 }
             }
         }
-
         private void TriggerBookAnimation(Farmer player)
         {
             if (player == null)
                 return;
 
-            // Create a temporary Price Catalogue object
-            var tempBook = new StardewValley.Object("104", 1);
+            // Create your custom book
+            var customBook = new CustomBook();
 
-            // Use reflection to call internal readBook method
+            // Use reflection to call the readBook method for the full animation
             var method = typeof(StardewValley.Object).GetMethod(
                 "readBook",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
@@ -156,17 +153,29 @@ namespace NemosMagicMod
 
             if (method != null)
             {
-                // Pass the player's current location instead of the player
-                method.Invoke(tempBook, new object[] { player.currentLocation });
+                // Backup experience
+                int[] expBackup = new int[player.experiencePoints.Count];
+                player.experiencePoints.CopyTo(expBackup, 0);
+
+                // Trigger animation
+                method.Invoke(customBook, new object[] { player.currentLocation });
+
+                // Restore experience
+                for (int i = 0; i < expBackup.Length; i++)
+                {
+                    player.experiencePoints[i] = expBackup[i];
+                }
             }
             else
             {
                 Monitor.Log("Failed to find Object.readBook via reflection.", LogLevel.Warn);
             }
         }
+
         private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
         {
         }
+
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
             spaceCoreApi = Helper.ModRegistry.GetApi<ISpaceCoreApi>("spacechase0.SpaceCore");
@@ -290,13 +299,13 @@ namespace NemosMagicMod
                 }
             }
         }
+
         public static void RegisterActiveSpell(Spell spell)
         {
             ActiveSpells.Add(spell);
             Instance.Monitor.Log($"Registered active spell: {spell.Name}", LogLevel.Trace);
         }
     }
-
 
     public static class SkillRegistrar
     {
@@ -317,5 +326,19 @@ namespace NemosMagicMod
             monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
         }
     }
-}
 
+    // Custom book class for animations
+    public class CustomBook : StardewValley.Object
+    {
+        public CustomBook() : base("102", 1) // Mapping Cave Systems
+        {
+            // Set up the book properties
+        }
+
+        public override bool performUseAction(GameLocation location)
+        {
+            Game1.playSound("dwop");
+            return true;
+        }
+    }
+}

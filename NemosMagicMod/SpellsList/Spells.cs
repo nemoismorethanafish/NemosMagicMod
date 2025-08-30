@@ -11,6 +11,7 @@ public abstract class Spell
     public const string SkillID = ModEntry.SkillID;
 
     protected virtual bool FreezePlayerDuringCast => true; // default: freeze
+    protected virtual bool UseBookAnimation => true; // NEW: toggle book animation
 
     public string Id { get; }
     public string Name { get; }
@@ -65,6 +66,66 @@ public abstract class Spell
         IsActive = true;
         ModEntry.RegisterActiveSpell(this);
 
+        // Choose animation type based on UseBookAnimation flag
+        if (UseBookAnimation)
+        {
+            // Use the book reading animation instead of spellbook
+            TriggerBookReadingAnimation(who);
+        }
+        else
+        {
+            // Use original spellbook animation
+            StartSpellbookAnimation(who);
+        }
+
+        // Play casting sound
+        Game1.playSound("wand");
+    }
+
+    /// <summary>
+    /// NEW: Triggers the book reading animation using your CustomBook
+    /// </summary>
+    private void TriggerBookReadingAnimation(Farmer who)
+    {
+        if (FreezePlayerDuringCast)
+            who.canMove = false;
+
+        // Create and trigger the custom book animation
+        var customBook = new CustomBook();
+
+        // Backup experience before animation
+        int[] expBackup = new int[who.experiencePoints.Count];
+        who.experiencePoints.CopyTo(expBackup, 0);
+
+        // Use reflection to call the readBook method
+        var method = typeof(StardewValley.Object).GetMethod(
+            "readBook",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
+        );
+
+        if (method != null)
+        {
+            method.Invoke(customBook, new object[] { who.currentLocation });
+
+            // Restore experience after animation (since we already granted it above)
+            for (int i = 0; i < expBackup.Length; i++)
+            {
+                who.experiencePoints[i] = expBackup[i];
+            }
+        }
+
+        // Restore movement after a delay (book animation duration)
+        if (FreezePlayerDuringCast)
+        {
+            DelayedAction.functionAfterDelay(() => who.canMove = true, 1000); // 1 second delay
+        }
+    }
+
+    /// <summary>
+    /// Original spellbook animation (renamed for clarity)
+    /// </summary>
+    private void StartSpellbookAnimation(Farmer who)
+    {
         // Start spellbook animation
         spellbookTimer = SpellbookDuration;
 
@@ -76,9 +137,6 @@ public abstract class Spell
 
         // Subscribe to rendering & update events
         SubscribeDraw();
-
-        // Play casting sound
-        Game1.playSound("wand");
     }
 
     /// <summary>Force the farmer sprite to frame 57 temporarily.</summary>
