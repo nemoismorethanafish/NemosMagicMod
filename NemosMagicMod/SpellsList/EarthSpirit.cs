@@ -64,32 +64,39 @@ public class EarthSpirit : Spell, IRenderable
             return;
         }
 
+        // Immediate base.Cast: mana, XP, spell activation
         base.Cast(who);
 
-        owner = who;
-
-        foreach (var spell in ModEntry.ActiveSpells)
+        // Delay only the EarthSpirit visual/effects
+        DelayedAction.functionAfterDelay(() =>
         {
-            if (spell is IRenderable renderable)
-                renderable.Unsubscribe();
+            owner = who;
 
-            spell.IsActive = false;
-        }
+            // Reset EarthSpirit state
+            foreach (var spell in ModEntry.ActiveSpells)
+            {
+                if (spell is IRenderable renderable)
+                    renderable.Unsubscribe();
 
-        IsActive = true;
-        spellTimer = 0f;
-        currentTargetTile = null;
-        isReturning = false;
-        toolPosition = who.Position + new Vector2(0, -64f);
+                spell.IsActive = false;
+            }
 
-        if (!subscribed)
-        {
-            ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
-            ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
-            subscribed = true;
-        }
+            IsActive = true;
+            spellTimer = 0f;
+            currentTargetTile = null;
+            isReturning = false;
+            toolPosition = who.Position + new Vector2(0, -64f);
 
-        Game1.playSound("hammer");
+            if (!subscribed)
+            {
+                ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+                ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+                subscribed = true;
+            }
+
+            Game1.playSound("hammer");
+
+        }, 1000); // 1 second delay before EarthSpirit visual/effects
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)

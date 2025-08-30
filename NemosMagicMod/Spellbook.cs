@@ -23,15 +23,11 @@ public class Spellbook : Tool
     }
     private SpellbookTier tier = SpellbookTier.Novice;
 
-    public static Texture2D? SpellbookTexture;
-
     // Add the tier textures
     private static Dictionary<SpellbookTier, Texture2D>? tierTextures;
 
     public static void LoadIcon(IModHelper helper)
     {
-        SpellbookTexture = helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
-
         // Load tier-specific textures based on book sprites
         LoadTierTextures(helper);
     }
