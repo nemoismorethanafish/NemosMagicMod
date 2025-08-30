@@ -71,11 +71,27 @@ public abstract class Spell
         if (FreezePlayerDuringCast)
             who.canMove = false;
 
+        // **Force Farmer to reading frame**
+        TriggerReadingFrame(who);
+
         // Subscribe to rendering & update events
         SubscribeDraw();
 
         // Play casting sound
         Game1.playSound("wand");
+    }
+
+    /// <summary>Force the farmer sprite to frame 57 temporarily.</summary>
+    protected void TriggerReadingFrame(Farmer who)
+    {
+        if (who?.FarmerSprite != null)
+        {
+            // Set the current frame to 57
+            who.FarmerSprite.CurrentFrame = 57;
+
+            // Optional: prevent automatic animation updates during spellbook
+            who.FarmerSprite.PauseForSingleAnimation = true;
+        }
     }
 
     private void SubscribeDraw()

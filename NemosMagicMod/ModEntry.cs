@@ -82,6 +82,14 @@ namespace NemosMagicMod
 
             var player = Game1.player;
 
+            if (!Context.IsPlayerFree)
+                return;
+
+            if (e.Button == SButton.L) // Trigger on L
+            {
+                TriggerBookAnimation(Game1.player);
+            }
+
             // Spell selection menu key
             if (e.Button == SButton.D9)
             {
@@ -103,6 +111,8 @@ namespace NemosMagicMod
                 }
                 return;
             }
+
+
 
 
             // --- Hardcoded right-click to trigger wizard interaction ---
@@ -179,6 +189,30 @@ namespace NemosMagicMod
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
         }
+
+
+        private void TriggerBookAnimation(Farmer who)
+        {
+            // Skill books are at tile index 167 (objects)
+            int tileIndex = 167;
+
+            TemporaryAnimatedSprite tas = new TemporaryAnimatedSprite(
+                tileIndex,                     // object sprite index
+                who.Position + new Vector2(0, -64f), // position above player
+                Color.White,                   // no tint
+                4,                             // 4 frames
+                false,                         // not flipped
+                100f                           // 100 ms per frame
+            )
+            {
+                scale = 4f,
+                layerDepth = 1f,
+                alpha = 1f
+            };
+
+            Game1.currentLocation.TemporarySprites.Add(tas);
+        }
+
 
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
@@ -268,6 +302,7 @@ namespace NemosMagicMod
         }
     }
 
+
     public static class SkillRegistrar
     {
         public static void Register(Skill skill, IMonitor monitor)
@@ -288,3 +323,4 @@ namespace NemosMagicMod
         }
     }
 }
+

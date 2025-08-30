@@ -12,7 +12,7 @@ namespace MagicSkill
         {
             this.ExperienceCurve = new int[]
             {
-                100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5000, 6000
+                100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000
             };
 
             Texture2D icon = NemosMagicMod.ModEntry.MagicSkillIcon;

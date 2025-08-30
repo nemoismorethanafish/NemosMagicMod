@@ -50,13 +50,7 @@ public static class SpellRegistry //List of all spells
         {
             if (spell.Id == "nemo.WindSpirit" ||
                 spell.Id == "nemo.Heal" ||
-                spell.Id == "nemo.Fireball" ||
-
-                spell.Id == "nemo.EarthSpirit" ||
-                spell.Id == "nemo.SeaSpirit" ||
-                spell.Id == "nemo.TimeWarp" ||
-                spell.Id == "nemo.HomeWarp" ||
-                spell.Id == "nemo.FertilitySpirit")
+                spell.Id == "nemo.Fireball")
             {
                 return true;
             }
