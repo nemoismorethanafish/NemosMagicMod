@@ -19,9 +19,9 @@ namespace MagicSkill
             this.Icon = icon;
             this.SkillsPageIcon = icon;
 
-            // Create the professions
-            var prof1 = new CantripFocusProfession(this);
-            var prof2 = new ArcaneSurgeProfession(this);
+            // Create the professions from Level5Professions
+            var prof1 = new Level5Professions.ArcaneMaster(this);
+            var prof2 = new Level5Professions.FireballCantrip(this);
 
             // Add the profession pair at level 5
             this.ProfessionsForLevels.Add(new ProfessionPair(5, prof1, prof2, null));
@@ -38,33 +38,5 @@ namespace MagicSkill
 
         public override string GetSkillPageHoverText(int level) =>
             $"Level {level} Magic bonus: {5 * level}";
-    }
-
-    public class CantripFocusProfession : Skill.Profession
-    {
-        public CantripFocusProfession(Skill parentSkill)
-            : base(parentSkill, "CantripFocus") { }
-
-        public override string GetName() => "Cantrip Focus";
-        public override string GetDescription() => "Choose this profession for flavor only (does nothing).";
-
-        public override void DoImmediateProfessionPerk()
-        {
-            // No functionality for now
-        }
-    }
-
-    public class ArcaneSurgeProfession : Skill.Profession
-    {
-        public ArcaneSurgeProfession(Skill parentSkill)
-            : base(parentSkill, "ArcaneSurge") { }
-
-        public override string GetName() => "Arcane Surge";
-        public override string GetDescription() => "Choose this profession for flavor only (does nothing).";
-
-        public override void DoImmediateProfessionPerk()
-        {
-            // No functionality for now
-        }
     }
 }
