@@ -14,24 +14,23 @@ namespace NemosMagicMod.Spells
     // --- Tier enum for Spellbook ---
     public enum SpellbookTier
     {
-        Basic, //remove this later
-        Novice,
+        Novice,    // starting tier
         Apprentice,
         Adept,
-        Master
+        Master     // final tier, no further upgrades
     }
 
     // --- Upgrade System ---
     public static class SpellbookUpgradeSystem
     {
         // Costs per tier
-        public static readonly int[] GoldCostPerTier = { 1000, 2500, 5000 };
+        public static readonly int[] GoldCostPerTier = { 2000, 5000, 20000 };
         public static readonly (string name, int count)[][] MaterialCostPerTier =
         {
-            new[] { ("Fire Quartz", 1), ("Iron Bar", 1) },       // Apprentice
-            new[] { ("Iridium Bar", 2), ("Magic Essence", 1) },  // Adept
-            new[] { ("Prismatic Shard", 1), ("Solar Essence", 5) } // Master
-        };
+    new[] { ("Frozen Tear", 1), ("Fire Quartz", 1) },       // Apprentice
+    new[] { ("Void Essence", 5), ("Solar Essence", 5) },   // Adept
+    new[] { ("Prismatic Shard", 1), ("Dragon Tooth", 5) }  // Master
+};
 
         // Remove items from inventory
         public static void RemoveItemsFromInventory(Farmer player, string itemName, int count)
@@ -60,6 +59,7 @@ namespace NemosMagicMod.Spells
         // Offer upgrade dialogue
         public static void OfferWizardUpgrade(Farmer player, Spellbook spellbook, IMonitor monitor)
         {
+            // Already at highest tier? Don’t show menu
             if (spellbook.Tier >= SpellbookTier.Master)
             {
                 Game1.showGlobalMessage("Your Spellbook is already at the highest tier!");
@@ -80,26 +80,19 @@ namespace NemosMagicMod.Spells
 
             void OnResponse(Farmer who, string whichAnswer)
             {
-                // Unsubscribe immediately
                 Game1.currentLocation.afterQuestion -= OnResponse;
 
                 if (whichAnswer == "Yes")
                 {
-                    // Fully clear dialogue first
                     Game1.dialogueUp = false;
                     Game1.activeClickableMenu = null;
-
-                    // Clear speaker so game stops thinking a conversation is active
                     Game1.currentSpeaker = null;
 
-                    // Then queue our menu for the next tick
                     Game1.delayedActions.Add(new DelayedAction(1, () =>
                     {
                         Game1.activeClickableMenu = new SpellbookUpgradeMenu(player, spellbook, monitor);
                     }));
                 }
-
-
             }
 
             Game1.currentLocation.afterQuestion += OnResponse;
@@ -125,8 +118,19 @@ namespace NemosMagicMod.Spells
                 this.monitor = monitor;
 
                 int nextTierIndex = (int)spellbook.Tier;
-                goldCost = SpellbookUpgradeSystem.GoldCostPerTier[nextTierIndex];
-                requiredMaterials = SpellbookUpgradeSystem.MaterialCostPerTier[nextTierIndex].ToList();
+
+                // --- SAFETY CHECK: prevent IndexOutOfRange ---
+                if (nextTierIndex >= GoldCostPerTier.Length || nextTierIndex >= MaterialCostPerTier.Length)
+                {
+                    monitor.Log($"No upgrade available for tier {spellbook.Tier}", LogLevel.Warn);
+                    Game1.showRedMessage("This Spellbook cannot be upgraded further.");
+                    Game1.exitActiveMenu();
+                    return;
+                }
+
+                // --- safe to read arrays now ---
+                goldCost = GoldCostPerTier[nextTierIndex];
+                requiredMaterials = MaterialCostPerTier[nextTierIndex].ToList();
 
                 upgradeButton = new ClickableComponent(
                     new Rectangle(xPositionOnScreen + 100, yPositionOnScreen + height - 100, 180, 50),
@@ -140,7 +144,7 @@ namespace NemosMagicMod.Spells
 
             public override void draw(SpriteBatch b)
             {
-                // Draw main menu box like inventory
+                // --- Draw main menu box like vanilla inventory ---
                 IClickableMenu.drawTextureBox(
                     b,
                     Game1.menuTexture,
@@ -154,41 +158,95 @@ namespace NemosMagicMod.Spells
                     true
                 );
 
+                int padding = 20;
+
                 // Title
-                SpriteText.drawString(b, $"Upgrade Spellbook: {spellbook.Tier}", xPositionOnScreen + 40, yPositionOnScreen + 40);
+                SpriteText.drawString(
+                    b,
+                    $"Upgrade Spellbook: {spellbook.Tier}",
+                    xPositionOnScreen + padding,
+                    yPositionOnScreen + padding
+                );
 
                 // Gold requirement
-                SpriteText.drawString(b, $"Gold: {goldCost}", xPositionOnScreen + 40, yPositionOnScreen + 100);
+                SpriteText.drawString(
+                    b,
+                    $"Gold: {goldCost}",
+                    xPositionOnScreen + padding,
+                    yPositionOnScreen + padding + 40
+                );
 
-                // Materials list
-                int offsetY = yPositionOnScreen + 160;
+                var itemIndices = new Dictionary<string, int>()
+{
+    { "Frozen Tear", 84 },
+    { "Fire Quartz", 82 },
+    { "Void Essence", 769 },
+    { "Solar Essence", 768 },
+    { "Prismatic Shard", 74 },
+    { "Dragon Tooth", 852 },
+    { "Iridium Bar", 337 }
+};
+
+                int tileSize = 16;
+                int scale = 4; // icon scale
+                int offsetY = yPositionOnScreen + padding + 120; // moved down 40 pixels
+
                 foreach (var (name, count) in requiredMaterials)
                 {
                     int playerCount = Game1.player.Items
                         .Where(i => i != null && i.Name == name)
                         .Sum(i => i.Stack);
 
-                    var obj = new StardewValley.Object(name, 1, false, 0, 0);
-                    obj.drawInMenu(
-                        b,
-                        new Vector2(xPositionOnScreen + 40, offsetY),
-                        1f, 1f, 1f,
-                        StackDrawType.Hide,
-                        Color.White,
-                        false
-                    );
+                    if (itemIndices.TryGetValue(name, out int parentSheetIndex))
+                    {
+                        int columns = Game1.objectSpriteSheet.Width / tileSize;
+                        int row = parentSheetIndex / columns;
+                        int col = parentSheetIndex % columns;
+                        Rectangle sourceRect = new Rectangle(col * tileSize, row * tileSize, tileSize, tileSize);
+
+                        b.Draw(
+                            Game1.objectSpriteSheet,
+                            new Vector2(xPositionOnScreen + padding, offsetY),
+                            sourceRect,
+                            Color.White,
+                            0f,
+                            Vector2.Zero,
+                            scale,
+                            SpriteEffects.None,
+                            1f
+                        );
+                    }
 
                     SpriteText.drawString(
                         b,
                         $"{name}: {playerCount}/{count}",
-                        xPositionOnScreen + 90,
-                        offsetY + 20
+                        xPositionOnScreen + padding + tileSize * scale + 10,
+                        offsetY + 4
                     );
 
-                    offsetY += 80; // more spacing for larger menu
+                    offsetY += tileSize * scale + 20;
                 }
 
-                // Draw buttons
+                // Buttons at bottom
+                int buttonY = yPositionOnScreen + height - 90;
+                int buttonWidth = 200; // slightly bigger
+                int buttonHeight = 60; // slightly bigger
+                int buttonSpacing = 40;
+
+                upgradeButton.bounds = new Rectangle(
+                    xPositionOnScreen + width / 2 - buttonWidth - buttonSpacing / 2,
+                    buttonY,
+                    buttonWidth,
+                    buttonHeight
+                );
+
+                cancelButton.bounds = new Rectangle(
+                    xPositionOnScreen + width / 2 + buttonSpacing / 2,
+                    buttonY,
+                    buttonWidth,
+                    buttonHeight
+                );
+
                 IClickableMenu.drawTextureBox(
                     b,
                     Game1.menuTexture,
@@ -201,6 +259,7 @@ namespace NemosMagicMod.Spells
                     1f,
                     true
                 );
+
                 IClickableMenu.drawTextureBox(
                     b,
                     Game1.menuTexture,
@@ -214,8 +273,19 @@ namespace NemosMagicMod.Spells
                     true
                 );
 
-                SpriteText.drawString(b, "Upgrade", upgradeButton.bounds.X + 30, upgradeButton.bounds.Y + 15);
-                SpriteText.drawString(b, "Cancel", cancelButton.bounds.X + 30, cancelButton.bounds.Y + 15);
+                SpriteText.drawString(
+                    b,
+                    "Upgrade",
+                    upgradeButton.bounds.X + 40,
+                    upgradeButton.bounds.Y + 18
+                );
+
+                SpriteText.drawString(
+                    b,
+                    "Cancel",
+                    cancelButton.bounds.X + 40,
+                    cancelButton.bounds.Y + 18
+                );
 
                 base.draw(b);
                 Game1.mouseCursorTransparency = 1f;

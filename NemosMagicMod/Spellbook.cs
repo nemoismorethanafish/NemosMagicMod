@@ -84,12 +84,4 @@ public class Spellbook : Tool
             layerDepth
         );
     }
-
-    [OnDeserialized]
-    private void OnDeserialized(StreamingContext context)
-    {
-        if (Tier == SpellbookTier.Basic)
-            Tier = SpellbookTier.Novice;
-    }
-
 }
