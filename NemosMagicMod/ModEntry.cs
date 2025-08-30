@@ -330,15 +330,32 @@ namespace NemosMagicMod
     // Custom book class for animations
     public class CustomBook : StardewValley.Object
     {
-        public CustomBook() : base("102", 1) // Mapping Cave Systems
+        public CustomBook() : base("102", 1, false, -1, 0)
         {
-            // Set up the book properties
+            // "102" = Lost Book (placeholder). 
+            // Swap with your intended ID or load from Data/Books if using 1.6-style books.
         }
 
         public override bool performUseAction(GameLocation location)
         {
-            Game1.playSound("dwop");
-            return true;
+            Farmer who = Game1.player;
+
+            // Prevent normal sound from playing.
+            // (Intentionally no Game1.playSound here.)
+
+            // Custom behavior: show book text / mark as read / etc.
+            // For now we’ll just display a message.
+            Game1.showGlobalMessage("You silently read the custom book...");
+
+            // --- Normally the vanilla code might do: ---
+            // who.gainExperience(skill, xpAmount);
+            // Game1.playSound("book");
+            // --- Both are intentionally removed here ---
+
+            // You could also trigger animations, buffs, or unlocks here
+            // without touching XP or sounds.
+
+            return true; // handled
         }
     }
 }
