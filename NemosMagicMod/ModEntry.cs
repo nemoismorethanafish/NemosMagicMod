@@ -82,9 +82,6 @@ namespace NemosMagicMod
 
             var player = Game1.player;
 
-            if (!Context.IsPlayerFree)
-                return;
-
             if (e.Button == SButton.L) // Trigger on L
             {
                 TriggerBookAnimation(Game1.player);
@@ -111,9 +108,6 @@ namespace NemosMagicMod
                 }
                 return;
             }
-
-
-
 
             // --- Hardcoded right-click to trigger wizard interaction ---
             if (e.Button == SButton.MouseRight)
@@ -143,6 +137,31 @@ namespace NemosMagicMod
                     else
                         Game1.showRedMessage("You don't have a Spellbook!");
                 }
+            }
+        }
+
+        private void TriggerBookAnimation(Farmer player)
+        {
+            if (player == null)
+                return;
+
+            // Create a temporary Price Catalogue object
+            var tempBook = new StardewValley.Object("104", 1);
+
+            // Use reflection to call internal readBook method
+            var method = typeof(StardewValley.Object).GetMethod(
+                "readBook",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic
+            );
+
+            if (method != null)
+            {
+                // Pass the player's current location instead of the player
+                method.Invoke(tempBook, new object[] { player.currentLocation });
+            }
+            else
+            {
+                Monitor.Log("Failed to find Object.readBook via reflection.", LogLevel.Warn);
             }
         }
         private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
@@ -189,30 +208,6 @@ namespace NemosMagicMod
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
         }
-
-
-        private void TriggerBookAnimation(Farmer who)
-        {
-            // Skill books are at tile index 167 (objects)
-            int tileIndex = 167;
-
-            TemporaryAnimatedSprite tas = new TemporaryAnimatedSprite(
-                tileIndex,                     // object sprite index
-                who.Position + new Vector2(0, -64f), // position above player
-                Color.White,                   // no tint
-                4,                             // 4 frames
-                false,                         // not flipped
-                100f                           // 100 ms per frame
-            )
-            {
-                scale = 4f,
-                layerDepth = 1f,
-                alpha = 1f
-            };
-
-            Game1.currentLocation.TemporarySprites.Add(tas);
-        }
-
 
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
