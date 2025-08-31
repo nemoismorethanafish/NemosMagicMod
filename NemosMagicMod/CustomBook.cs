@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewValley;
+using StardewValley.Extensions;
 using System.Reflection;
 
 public class CustomBook : StardewValley.Object
@@ -20,21 +21,22 @@ public class CustomBook : StardewValley.Object
         var player = Game1.player;
         if (player == null) return;
 
-        // Backup experience
-        int[] expBackup = new int[player.experiencePoints.Count];
-        player.experiencePoints.CopyTo(expBackup, 0);
+        // Spawn book-reading animation yourself
+        for (int i = 0; i < 12; i++)
+        {
+            location.temporarySprites.Add(
+                new TemporaryAnimatedSprite(
+                    354,
+                    Game1.random.Next(25, 75),
+                    6,
+                    1,
+                    player.Position + new Vector2(Game1.random.Next(-64, 64), Game1.random.Next(-64, 64)),
+                    flicker: false,
+                    Game1.random.NextBool()
+                )
+            );
+        }
 
-        // Call internal readBook method via reflection
-        var method = typeof(StardewValley.Object).GetMethod(
-            "readBook",
-            BindingFlags.Instance | BindingFlags.NonPublic
-        );
-
-        if (method != null)
-            method.Invoke(this, new object[] { location });
-
-        // Restore experience so no XP is gained
-        for (int i = 0; i < expBackup.Length; i++)
-            player.experiencePoints[i] = expBackup[i];
+        // No XP gain, no sound
     }
 }

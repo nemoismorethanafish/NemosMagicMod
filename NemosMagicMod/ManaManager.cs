@@ -1,4 +1,7 @@
-﻿using System;
+﻿using MagicSkill;
+using SpaceCore;
+using StardewValley;
+using System;
 
 namespace NemosMagicMod
 {

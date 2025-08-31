@@ -47,7 +47,7 @@ namespace NemosMagicMod
 
             // LevelUpChanges, mana bar, etc.
             new LevelUpChanges(helper, Monitor);
-            ManaManager.SetMaxMana(100);
+            ManaManager.SetMaxMana(ManaManager.MaxMana);
             ManaManager.Refill();
 
             manaBar = new ManaBar(
@@ -200,23 +200,37 @@ namespace NemosMagicMod
 
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            Helper.Events.GameLoop.UpdateTicked += GiveSpellbookOnceSafely;
-            Helper.Events.GameLoop.UpdateTicked += RunUpdateMagicLevelOnce;
+            // Run these once after the first UpdateTicked after day start
+            Helper.Events.GameLoop.UpdateTicked += RunDayStartSetup;
         }
 
-        private void GiveSpellbookOnceSafely(object? sender, UpdateTickedEventArgs e)
+        private void RunDayStartSetup(object? sender, UpdateTickedEventArgs e)
         {
-            Helper.Events.GameLoop.UpdateTicked -= GiveSpellbookOnceSafely;
+            Helper.Events.GameLoop.UpdateTicked -= RunDayStartSetup;
 
-            var player = Game1.player;
-            if (player == null) return;
+            if (Game1.player == null)
+                return;
 
-            if (!PlayerHasSpellbookAnywhere(player))
+            // Update Magic level
+            MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
+            Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
+
+            // Set max mana based on skill level
+            int baseMana = 100;
+            int totalMana = baseMana + 5 * MagicLevel;
+            ManaManager.SetMaxMana(totalMana);
+            ManaManager.Refill();
+
+            Monitor.Log($"Max Mana after day start setup: {ManaManager.MaxMana}", LogLevel.Debug);
+
+            // Give spellbook if the player doesn't have one
+            if (!PlayerHasSpellbookAnywhere(Game1.player))
             {
-                player.addItemToInventory(new Spellbook());
+                Game1.player.addItemToInventory(new Spellbook());
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
         }
+
 
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
@@ -259,12 +273,6 @@ namespace NemosMagicMod
         private void OnSaving(object? sender, SavingEventArgs e)
         {
             Helper.Data.WriteSaveData("player-save-data", SaveData);
-        }
-
-        private void RunUpdateMagicLevelOnce(object? sender, UpdateTickedEventArgs e)
-        {
-            Helper.Events.GameLoop.UpdateTicked -= RunUpdateMagicLevelOnce;
-            UpdateMagicLevel();
         }
 
         private void UpdateMagicLevel()
@@ -324,38 +332,6 @@ namespace NemosMagicMod
             catch (InvalidOperationException) { }
 
             monitor.Log($"Skill '{skill.Id}' registered using SpaceCore API.", LogLevel.Info);
-        }
-    }
-
-    // Custom book class for animations
-    public class CustomBook : StardewValley.Object
-    {
-        public CustomBook() : base("102", 1, false, -1, 0)
-        {
-            // "102" = Lost Book (placeholder). 
-            // Swap with your intended ID or load from Data/Books if using 1.6-style books.
-        }
-
-        public override bool performUseAction(GameLocation location)
-        {
-            Farmer who = Game1.player;
-
-            // Prevent normal sound from playing.
-            // (Intentionally no Game1.playSound here.)
-
-            // Custom behavior: show book text / mark as read / etc.
-            // For now we’ll just display a message.
-            Game1.showGlobalMessage("You silently read the custom book...");
-
-            // --- Normally the vanilla code might do: ---
-            // who.gainExperience(skill, xpAmount);
-            // Game1.playSound("book");
-            // --- Both are intentionally removed here ---
-
-            // You could also trigger animations, buffs, or unlocks here
-            // without touching XP or sounds.
-
-            return true; // handled
         }
     }
 }

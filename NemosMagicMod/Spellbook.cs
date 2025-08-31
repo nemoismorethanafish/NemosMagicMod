@@ -37,8 +37,8 @@ public class Spellbook : Tool
         // We'll use the game's book sprites
         tierTextures = new Dictionary<SpellbookTier, Texture2D>
         {
-            { SpellbookTier.Novice, Game1.objectSpriteSheet },      // All use the same sprite sheet
-            { SpellbookTier.Apprentice, Game1.objectSpriteSheet },  // but different source rectangles
+            { SpellbookTier.Novice, Game1.objectSpriteSheet },     
+            { SpellbookTier.Apprentice, Game1.objectSpriteSheet },  
             { SpellbookTier.Adept, Game1.objectSpriteSheet },
             { SpellbookTier.Master, Game1.objectSpriteSheet }
         };
@@ -49,9 +49,9 @@ public class Spellbook : Tool
         return tier switch
         {
             SpellbookTier.Novice => 102,      // Mapping Cave Systems
-            SpellbookTier.Apprentice => 106,  // Way of the Wind pt. 1
-            SpellbookTier.Adept => 108,       // Dwarvish Safety Manual
-            SpellbookTier.Master => 107,      // Book of Stars
+            SpellbookTier.Apprentice => 102,  // Way of the Wind pt. 1
+            SpellbookTier.Adept => 102,       // Dwarvish Safety Manual
+            SpellbookTier.Master => 102,      // Book of Stars
             _ => 102
         };
     }
