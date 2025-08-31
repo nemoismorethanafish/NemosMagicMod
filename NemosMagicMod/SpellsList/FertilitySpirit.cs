@@ -14,6 +14,7 @@ namespace NemosMagicMod.Spells
         private const int GrowthRadius = 1; // radius in tiles around player
         private const int ParticleCount = 12;
         private const string LastCastKey = "NemosMagicMod.FertilitySpirit.LastCastDay";
+        protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
         public FertilitySpirit()
             : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 15)
@@ -23,8 +24,17 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // --- Minimum spellbook tier check ---
+            if (!HasSufficientSpellbookTier(who))
+            {
+                string requiredTierName = MinimumTier.ToString();
+                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+                return;
+            }
+
             // Generate a unique ID for today
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
+
 
             // Check if already cast today
             if (who.modData.TryGetValue(LastCastKey, out string lastDayStr) && int.TryParse(lastDayStr, out int lastDay))
@@ -35,7 +45,6 @@ namespace NemosMagicMod.Spells
                     return;
                 }
             }
-
             // --- Not Enough Mana check ---
             if (who.Stamina < this.ManaCost) // or however your mod tracks mana
             {

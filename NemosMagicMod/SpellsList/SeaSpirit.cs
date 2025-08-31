@@ -47,7 +47,7 @@ namespace NemosMagicMod.Spells
         private float currentSpellDuration = BaseBubbleDuration;
 
         // Override minimum tier requirement
-        protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
+        protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
 
         public SeaSpirit()
             : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates. Duration and coverage increase with spellbook tier.", 25)

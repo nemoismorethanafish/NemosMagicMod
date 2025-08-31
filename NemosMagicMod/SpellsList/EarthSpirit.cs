@@ -25,6 +25,9 @@ public class EarthSpirit : Spell, IRenderable
     private float spellDuration = 20f; // Base duration - will be modified by tier
     private readonly float hoverHeight = 32f;
 
+    protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
+
+
     // Tier-based duration multipliers
     private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
     {
@@ -47,9 +50,6 @@ public class EarthSpirit : Spell, IRenderable
 
     private bool isReturning = false;
     private Farmer owner;
-
-    // Override minimum tier requirement
-    protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
 
     public EarthSpirit()
         : base("nemo.EarthSpirit", "Earth Spirit",
@@ -81,6 +81,7 @@ public class EarthSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
+        // --- Minimum spellbook tier check ---
         if (!HasSufficientSpellbookTier(who))
         {
             string requiredTierName = MinimumTier.ToString();

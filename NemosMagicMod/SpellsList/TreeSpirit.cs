@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
+using NemosMagicMod.Spells;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.TerrainFeatures;
@@ -36,6 +37,9 @@ public class TreeSpirit : Spell, IRenderable
 
     public bool IsActive { get; private set; }
 
+    protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
+
+
     public TreeSpirit()
         : base("spirit_tree", "Tree Spirit",
               "Summons a magical axe that chops trees.",
@@ -55,6 +59,13 @@ public class TreeSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
+        if (!HasSufficientSpellbookTier(who))
+        {
+            string requiredTierName = MinimumTier.ToString();
+            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            return;
+        }
+
         // --- Not Enough Mana check ---
         if (!ManaManager.HasEnoughMana(ManaCost))
         {

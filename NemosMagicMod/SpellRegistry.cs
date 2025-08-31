@@ -9,6 +9,8 @@ public static class SpellRegistry //List of all spells
     public static Spell WindSpirit = new WindSpirit();
     public static Spell Heal = new Heal();
     public static Spell Fireball = new Fireball();
+    public static Spell FireballCantrip { get; } = new FireballCantrip();
+
     public static Spell WaterSpirit = new WaterSpirit();
     public static Spell TreeSpirit { get; } = new TreeSpirit();
     public static Spell EarthSpirit { get; } = new EarthSpirit();
@@ -30,6 +32,7 @@ public static class SpellRegistry //List of all spells
         WindSpirit,
         Heal,
         Fireball,
+        FireballCantrip,
         WaterSpirit,
         TreeSpirit,
         EarthSpirit,
@@ -49,8 +52,7 @@ public static class SpellRegistry //List of all spells
         public static bool IsSpellUnlocked(Spell spell)
         {
             if (spell.Id == "nemo.WindSpirit" ||
-                spell.Id == "nemo.Heal" ||
-                spell.Id == "nemo.Fireball")
+                spell.Id == "nemo.Heal")
             {
                 return true;
             }

@@ -8,7 +8,7 @@ namespace NemosMagicMod.Spells
 {
     public class Fireball : Spell
     {
-        public override bool IsUnlocked => true; // change to false when using cantrip version
+        public override bool IsUnlocked => SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id);
         protected override bool UseBookAnimation => false;        // skip book animation
         protected override bool FreezePlayerDuringCast => false;
 
@@ -21,7 +21,11 @@ namespace NemosMagicMod.Spells
                 manaCost: 5,
                 experienceGained: 10
             )
-        { }
+        {
+            if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id))
+                SpellRegistry.PlayerData.UnlockedSpellIds.Add(this.Id);
+        }
+
 
         public override void Cast(Farmer who)
         {

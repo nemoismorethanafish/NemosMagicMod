@@ -21,7 +21,7 @@ namespace MagicSkill
 
             // Create the professions from Level5Professions
             var prof1 = new Level5Professions.ArcaneMaster(this);
-            var prof2 = new Level5Professions.FireballCantrip(this);
+            var prof2 = new Level5Professions.BattleMage(this);
 
             // Add the profession pair at level 5
             this.ProfessionsForLevels.Add(new ProfessionPair(5, prof1, prof2, null));

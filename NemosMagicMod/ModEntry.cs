@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using MagicSkill;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod.Spells;
 using SpaceCore;
@@ -12,9 +13,9 @@ using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static Level5Professions;
 using static NemosMagicMod.Spells.SpellbookUpgradeSystem;
 using static SpaceCore.Skills;
-using Microsoft.Xna.Framework;
 
 namespace NemosMagicMod
 {
@@ -218,6 +219,16 @@ namespace NemosMagicMod
             // Set max mana based on skill level
             int baseMana = 100;
             int totalMana = baseMana + 5 * MagicLevel;
+
+            // Get the profession ID for ArcaneMaster
+            int arcaneMasterId = GetProfessionId(SkillID, "ArcaneMaster");
+
+            // Apply bonus if player has ArcaneMaster
+            if (Game1.player.professions.Contains(arcaneMasterId))
+            {
+                totalMana += 50;
+            }
+
             ManaManager.SetMaxMana(totalMana);
             ManaManager.Refill();
 
@@ -231,6 +242,12 @@ namespace NemosMagicMod
             }
         }
 
+        private int GetProfessionId(string skill, string profession)
+        {
+            return Skills.GetSkill(skill).Professions
+                         .Single(p => p.Id == profession)
+                         .GetVanillaId();
+        }
 
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
