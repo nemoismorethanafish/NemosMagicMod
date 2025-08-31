@@ -55,8 +55,7 @@ public static class SpellRegistry //List of all spells
         public static bool IsSpellUnlocked(Spell spell)
         {
             if (spell.Id == "nemo.WindSpirit" ||
-                spell.Id == "nemo.Heal" ||
-                spell.Id == "nemo.FireCyclone")
+                spell.Id == "nemo.Heal")
             {
                 return true;
             }

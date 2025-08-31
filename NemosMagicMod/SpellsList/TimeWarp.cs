@@ -12,7 +12,7 @@ namespace NemosMagicMod.Spells
     public class TimeWarp : Spell
     {
         private const int EarliestTime = 600; // 6:00 AM
-        private const int MinimumCastTime = 800; // must be at least 7:00 AM
+        private const int MinimumCastTime = 800; // must be at least 8:00 AM
         private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
@@ -39,7 +39,7 @@ namespace NemosMagicMod.Spells
                   id: "nemo.TimeWarp",
                   name: "Time Warp",
                   description: "Bend time backwards. Can only be cast once per day.",
-                  manaCost: 75,
+                  manaCost: 100,
                   experienceGained: 50,
                   isActive: false)
         {

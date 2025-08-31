@@ -1,5 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using NemosMagicMod;
+using NemosMagicMod.Spells;
+using SpaceCore;
 using StardewValley;
 using StardewValley.Monsters;
 using StardewValley.Tools;
@@ -20,24 +23,42 @@ public class FireCyclone : Spell, Spell.IRenderable
     private float rotation = 0f;
     private GameLocation currentLocation;
 
+    protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
+
     public FireCyclone()
         : base(
             id: "nemo.FireCyclone",
             name: "Fire Cyclone",
             description: "Create a swirling fire cyclone around you, pushing enemies away.",
-            manaCost: 75
+            manaCost: 100,
+            experienceGained: 50
         )
     { }
 
     public override void Cast(Farmer who)
     {
-        base.Cast(who);
+        // --- Not Enough Mana check ---
+        if (!ManaManager.HasEnoughMana(ManaCost))
+        {
+            Game1.showRedMessage("Not enough mana!");
+            return;
+        }
+
+        // --- Minimum spellbook tier check ---
+        if (!HasSufficientSpellbookTier(who))
+        {
+            string requiredTierName = MinimumTier.ToString(); // "Adept"
+            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            return; // Cancel spell
+        }
 
         if (IsActive)
         {
             Game1.showRedMessage("Fire Cyclone is already active!");
             return;
         }
+
+        base.Cast(who);
 
         owner = who;
         currentLocation = who.currentLocation;
@@ -105,7 +126,7 @@ public class FireCyclone : Spell, Spell.IRenderable
         }
 
         // Update rotation (similar to ActiveCyclone)
-        rotation += 0.15f;
+        rotation += 0.03f;
 
         // Update sprite positions in a circle around the player
         for (int i = 0; i < sprites.Count; i++)
@@ -130,7 +151,7 @@ public class FireCyclone : Spell, Spell.IRenderable
         DamageMonstersInArea();
 
         // Optional: Break objects like the original ActiveCyclone
-        BreakObjectsInArea();
+        // BreakObjectsInArea();
     }
 
     private void OnLocationChanged()
@@ -194,39 +215,39 @@ public class FireCyclone : Spell, Spell.IRenderable
         }
     }
 
-    private void BreakObjectsInArea()
-    {
-        if (owner?.currentLocation == null) return;
+    //private void BreakObjectsInArea()
+    //{
+    //    if (owner?.currentLocation == null) return;
 
-        // Create a pickaxe for breaking objects (like ActiveCyclone)
-        var pickaxe = new Pickaxe { UpgradeLevel = 3 };
+    //    // Create a pickaxe for breaking objects (like ActiveCyclone)
+    //    var pickaxe = new Pickaxe { UpgradeLevel = 3 };
 
-        var objectsToCheck = currentLocation.objects.Keys.ToList();
+    //    var objectsToCheck = currentLocation.objects.Keys.ToList();
 
-        foreach (var tilePos in objectsToCheck)
-        {
-            var obj = currentLocation.objects[tilePos];
-            if (obj == null) continue;
+    //    foreach (var tilePos in objectsToCheck)
+    //    {
+    //        var obj = currentLocation.objects[tilePos];
+    //        if (obj == null) continue;
 
-            string objName = obj.Name?.ToLower() ?? "";
+    //        string objName = obj.Name?.ToLower() ?? "";
 
-            // Check if it's a breakable object
-            if (objName.Contains("stone") || objName.Contains("rock") ||
-                objName.Contains("node") || objName.Contains("crate") ||
-                objName.Contains("barrel") || objName.Contains("box") ||
-                objName.Contains("weed") || objName.Contains("litter"))
-            {
-                Vector2 objectWorldPos = tilePos * 64f + new Vector2(32f, 32f);
+    //        // Check if it's a breakable object
+    //        if (objName.Contains("stone") || objName.Contains("rock") ||
+    //            objName.Contains("node") || objName.Contains("crate") ||
+    //            objName.Contains("barrel") || objName.Contains("box") ||
+    //            objName.Contains("weed") || objName.Contains("litter"))
+    //        {
+    //            Vector2 objectWorldPos = tilePos * 64f + new Vector2(32f, 32f);
 
-                if (Vector2.Distance(owner.Position, objectWorldPos) < Radius)
-                {
-                    float originalStamina = owner.stamina;
-                    pickaxe.DoFunction(currentLocation, (int)(tilePos.X * 64f), (int)(tilePos.Y * 64f), 0, owner);
-                    owner.stamina = originalStamina; // Restore stamina
-                }
-            }
-        }
-    }
+    //            if (Vector2.Distance(owner.Position, objectWorldPos) < Radius)
+    //            {
+    //                float originalStamina = owner.stamina;
+    //                pickaxe.DoFunction(currentLocation, (int)(tilePos.X * 64f), (int)(tilePos.Y * 64f), 0, owner);
+    //                owner.stamina = originalStamina; // Restore stamina
+    //            }
+    //        }
+    //    }
+    //}
 
     private void EndCyclone()
     {

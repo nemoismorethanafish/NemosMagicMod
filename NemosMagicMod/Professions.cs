@@ -1,4 +1,5 @@
-﻿using SpaceCore;
+﻿using NemosMagicMod;
+using SpaceCore;
 using StardewModdingAPI;
 using StardewValley;
 using System.Threading;
@@ -67,7 +68,11 @@ public static class Level10Professions
 
         public override void DoImmediateProfessionPerk()
         {
-            // Functionality to be implemented later
+            if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.FireCyclone.Id))
+            {
+                SpellRegistry.PlayerData.UnlockedSpellIds.Add(SpellRegistry.FireCyclone.Id);
+                ModEntry.Instance.Monitor.Log("Unlocked Fire Cyclone spell via War Wizard profession!", LogLevel.Info);
+            }
         }
     }
 

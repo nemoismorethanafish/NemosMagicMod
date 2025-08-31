@@ -39,16 +39,34 @@ namespace NemosMagicMod.Spells
 
             NemosMagicMod.ModEntry.Instance.Monitor.Log("Fireball cast via spellbook!", LogLevel.Info);
 
+            // Cursor world position
             Vector2 cursorScreenPos = new Vector2(Game1.getMouseX(), Game1.getMouseY());
             Vector2 cursorWorldPos = cursorScreenPos + new Vector2(Game1.viewport.X, Game1.viewport.Y);
 
-            Vector2 startPosition = who.Position;
-            Vector2 velocity = cursorWorldPos - startPosition;
+            // Start at farmer chest, adjusted by facing direction
+            Vector2 chestPosition = who.getStandingPosition();
+            switch (who.FacingDirection)
+            {
+                case 0: // Up
+                    chestPosition.Y -= 64f; // higher chest
+                    break;
+                case 1: // Right
+                    chestPosition.X += 32f; // shift to right shoulder
+                    chestPosition.Y -= 48f;
+                    break;
+                case 2: // Down
+                    chestPosition.Y -= 32f; // lower since facing down
+                    break;
+                case 3: // Left
+                    chestPosition.X -= 32f; // shift to left shoulder
+                    chestPosition.Y -= 48f;
+                    break;
+            }
+
+            // Calculate velocity from chest toward cursor
+            Vector2 velocity = cursorWorldPos - chestPosition;
             velocity.Normalize();
             velocity *= 10f;
-
-            Texture2D projectileTexture = Game1.mouseCursors;
-            Rectangle sourceRect = Game1.getSourceRectForStandardTileSheet(Game1.mouseCursors, 0, 16, 16);
 
             var fireball = new BasicProjectile(
                 damageToFarmer: 25,
@@ -58,7 +76,7 @@ namespace NemosMagicMod.Spells
                 rotationVelocity: 0f,
                 xVelocity: velocity.X,
                 yVelocity: velocity.Y,
-                startingPosition: who.getStandingPosition(),
+                startingPosition: chestPosition,
                 collisionSound: "fireball_hit",
                 bounceSound: "fireball_bounce",
                 firingSound: "fireball_launch",
