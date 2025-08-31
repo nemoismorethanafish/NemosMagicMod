@@ -43,32 +43,33 @@ namespace NemosMagicMod.Spells
             // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
 
-            // Play teleport bubble animation immediately
-            for (int i = 0; i < 12; i++)
-            {
-                who.currentLocation.temporarySprites.Add(
-                    new TemporaryAnimatedSprite(
-                        354,
-                        Game1.random.Next(25, 75),
-                        6,
-                        1,
-                        who.Position + new Vector2(Game1.random.Next(-64, 64), Game1.random.Next(-64, 64)),
-                        flicker: false,
-                        Game1.random.NextBool()
-                    )
-                );
-            }
-
-            who.playNearbySoundAll("wand");
-            Game1.displayFarmer = false;
-            who.temporarilyInvincible = true;
-            who.temporaryInvincibilityTimer = -2000;
-            who.freezePause = 1000;
-            Game1.flashAlpha = 1f;
-
-            // --- Delay actual warp by 1 second (1000ms) ---
+            // --- Delay everything by 1 second (1000ms) ---
             DelayedAction.functionAfterDelay(() =>
             {
+                // Play teleport bubble animation
+                for (int i = 0; i < 12; i++)
+                {
+                    who.currentLocation.temporarySprites.Add(
+                        new TemporaryAnimatedSprite(
+                            354,
+                            Game1.random.Next(25, 75),
+                            6,
+                            1,
+                            who.Position + new Vector2(Game1.random.Next(-64, 64), Game1.random.Next(-64, 64)),
+                            flicker: false,
+                            Game1.random.NextBool()
+                        )
+                    );
+                }
+
+                who.playNearbySoundAll("wand");
+                Game1.displayFarmer = false;
+                who.temporarilyInvincible = true;
+                who.temporaryInvincibilityTimer = -2000;
+                who.freezePause = 1000;
+                Game1.flashAlpha = 1f;
+
+                // Warp the player
                 WarpToHome(who);
             }, 1000);
         }
