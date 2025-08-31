@@ -119,7 +119,7 @@ namespace NemosMagicMod.Spells
 
                 int nextTierIndex = (int)spellbook.Tier;
 
-                // --- SAFETY CHECK: prevent IndexOutOfRange ---
+                // Safety check
                 if (nextTierIndex >= GoldCostPerTier.Length || nextTierIndex >= MaterialCostPerTier.Length)
                 {
                     monitor.Log($"No upgrade available for tier {spellbook.Tier}", LogLevel.Warn);
@@ -128,23 +128,38 @@ namespace NemosMagicMod.Spells
                     return;
                 }
 
-                // --- safe to read arrays now ---
                 goldCost = GoldCostPerTier[nextTierIndex];
                 requiredMaterials = MaterialCostPerTier[nextTierIndex].ToList();
 
+                int buttonWidth = 220;
+                int buttonHeight = 70;
+                int buttonSpacing = 40;
+                int buttonY = yPositionOnScreen + height - 90;
+
                 upgradeButton = new ClickableComponent(
-                    new Rectangle(xPositionOnScreen + 100, yPositionOnScreen + height - 100, 180, 50),
-                    "Upgrade"
+                    new Rectangle(
+                        xPositionOnScreen + width / 2 - buttonWidth - buttonSpacing / 2,
+                        buttonY,
+                        buttonWidth,
+                        buttonHeight),
+                    "Study"
                 );
+
                 cancelButton = new ClickableComponent(
-                    new Rectangle(xPositionOnScreen + width - 280, yPositionOnScreen + height - 100, 180, 50),
+                    new Rectangle(
+                        xPositionOnScreen + width / 2 + buttonSpacing / 2,
+                        buttonY,
+                        buttonWidth,
+                        buttonHeight),
                     "Cancel"
                 );
             }
 
+            private bool CanStudy => Game1.timeOfDay < 1800; // true before 6 PM
+
             public override void draw(SpriteBatch b)
             {
-                // --- Draw main menu box like vanilla inventory ---
+                // Draw main menu box
                 IClickableMenu.drawTextureBox(
                     b,
                     Game1.menuTexture,
@@ -160,10 +175,11 @@ namespace NemosMagicMod.Spells
 
                 int padding = 20;
 
-                // Title
+                // Title: show next tier
+                SpellbookTier nextTier = spellbook.Tier < SpellbookTier.Master ? spellbook.Tier + 1 : SpellbookTier.Master;
                 SpriteText.drawString(
                     b,
-                    $"Upgrade Spellbook: {spellbook.Tier}",
+                    $"Upgrade Spellbook: {nextTier}",
                     xPositionOnScreen + padding,
                     yPositionOnScreen + padding
                 );
@@ -176,26 +192,25 @@ namespace NemosMagicMod.Spells
                     yPositionOnScreen + padding + 40
                 );
 
+                // Draw required materials
                 var itemIndices = new Dictionary<string, int>()
-{
-    { "Frozen Tear", 84 },
-    { "Fire Quartz", 82 },
-    { "Void Essence", 769 },
-    { "Solar Essence", 768 },
-    { "Prismatic Shard", 74 },
-    { "Dragon Tooth", 852 },
-    { "Iridium Bar", 337 }
-};
+        {
+            { "Frozen Tear", 84 },
+            { "Fire Quartz", 82 },
+            { "Void Essence", 769 },
+            { "Solar Essence", 768 },
+            { "Prismatic Shard", 74 },
+            { "Dragon Tooth", 852 },
+            { "Iridium Bar", 337 }
+        };
 
                 int tileSize = 16;
-                int scale = 4; // icon scale
-                int offsetY = yPositionOnScreen + padding + 120; // moved down 40 pixels
+                int scale = 4;
+                int offsetY = yPositionOnScreen + padding + 120;
 
                 foreach (var (name, count) in requiredMaterials)
                 {
-                    int playerCount = Game1.player.Items
-                        .Where(i => i != null && i.Name == name)
-                        .Sum(i => i.Stack);
+                    int playerCount = Game1.player.Items.Where(i => i != null && i.Name == name).Sum(i => i.Stack);
 
                     if (itemIndices.TryGetValue(name, out int parentSheetIndex))
                     {
@@ -227,25 +242,8 @@ namespace NemosMagicMod.Spells
                     offsetY += tileSize * scale + 20;
                 }
 
-                // Buttons at bottom
-                int buttonY = yPositionOnScreen + height - 90;
-                int buttonWidth = 200; // slightly bigger
-                int buttonHeight = 60; // slightly bigger
-                int buttonSpacing = 40;
-
-                upgradeButton.bounds = new Rectangle(
-                    xPositionOnScreen + width / 2 - buttonWidth - buttonSpacing / 2,
-                    buttonY,
-                    buttonWidth,
-                    buttonHeight
-                );
-
-                cancelButton.bounds = new Rectangle(
-                    xPositionOnScreen + width / 2 + buttonSpacing / 2,
-                    buttonY,
-                    buttonWidth,
-                    buttonHeight
-                );
+                // Draw buttons
+                Color studyColor = CanStudy ? Color.White : Color.Gray;
 
                 IClickableMenu.drawTextureBox(
                     b,
@@ -255,7 +253,7 @@ namespace NemosMagicMod.Spells
                     upgradeButton.bounds.Y,
                     upgradeButton.bounds.Width,
                     upgradeButton.bounds.Height,
-                    Color.White,
+                    studyColor,
                     1f,
                     true
                 );
@@ -275,7 +273,7 @@ namespace NemosMagicMod.Spells
 
                 SpriteText.drawString(
                     b,
-                    "Upgrade",
+                    "Study",
                     upgradeButton.bounds.X + 40,
                     upgradeButton.bounds.Y + 18
                 );
@@ -287,16 +285,87 @@ namespace NemosMagicMod.Spells
                     cancelButton.bounds.Y + 18
                 );
 
+                // Hover tooltip for Study button
+                if (upgradeButton.containsPoint(Game1.getOldMouseX(), Game1.getOldMouseY()))
+                {
+                    string tooltip = CanStudy
+                        ? "Studying this spellbook will advance it to the next tier. It will take 6 hours."
+                        : "Cannot study after 6 PM.";
+
+                    int tooltipMaxWidth = 600; // twice as wide
+                    int tooltipPadding = 8;
+                    int lineHeight = 28; // more spacing between lines
+
+                    // Split text into lines
+                    List<string> lines = new List<string>();
+                    string currentLine = "";
+                    foreach (string word in tooltip.Split(' '))
+                    {
+                        string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
+                        if (SpriteText.getWidthOfString(testLine) <= tooltipMaxWidth)
+                            currentLine = testLine;
+                        else
+                        {
+                            lines.Add(currentLine);
+                            currentLine = word;
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(currentLine))
+                        lines.Add(currentLine);
+
+                    // Tooltip dimensions
+                    int boxWidth = tooltipMaxWidth + tooltipPadding * 2;
+                    int boxHeight = (lines.Count + 1) * lineHeight + tooltipPadding * 2;
+
+                    // Position tooltip, adjust if it would go off-screen
+                    int tooltipX = Game1.getOldMouseX() + 16;
+                    int tooltipY = Game1.getOldMouseY() + 16;
+                    if (tooltipY + boxHeight > Game1.uiViewport.Height)
+                        tooltipY = Game1.uiViewport.Height - boxHeight - 16; // move up
+
+                    Rectangle background = new Rectangle(tooltipX, tooltipY, boxWidth, boxHeight);
+                    IClickableMenu.drawTextureBox(
+                        Game1.spriteBatch,
+                        Game1.menuTexture,
+                        new Rectangle(0, 256, 60, 60),
+                        background.X,
+                        background.Y,
+                        background.Width,
+                        background.Height,
+                        Color.White,
+                        1f,
+                        true
+                    );
+
+                    // Draw each line
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        SpriteText.drawString(
+                            Game1.spriteBatch,
+                            lines[i],
+                            background.X + tooltipPadding + 8,
+                            background.Y + tooltipPadding + i * lineHeight
+                        );
+                    }
+                }
+
+
+
+
                 base.draw(b);
                 Game1.mouseCursorTransparency = 1f;
                 drawMouse(b);
             }
 
-
             public override void receiveLeftClick(int x, int y, bool playSound = true)
             {
                 if (upgradeButton.containsPoint(x, y))
-                    AttemptUpgrade();
+                {
+                    if (CanStudy)
+                        AttemptUpgrade();
+                    else
+                        Game1.showRedMessage("Cannot study after 6 PM.");
+                }
                 else if (cancelButton.containsPoint(x, y))
                     Game1.exitActiveMenu();
             }
@@ -330,12 +399,14 @@ namespace NemosMagicMod.Spells
 
                 // Upgrade tier
                 spellbook.Tier++;
-
-                // Update the spellbook's appearance to match new tier
                 spellbook.UpdateTierAppearance();
 
                 Game1.showGlobalMessage($"Your Spellbook has been upgraded to {spellbook.Tier}!");
                 monitor.Log($"Spellbook upgraded to {spellbook.Tier}", LogLevel.Info);
+
+                // Advance time by 6 hours
+                Game1.timeOfDay += 600;
+                if (Game1.timeOfDay >= 2600) Game1.timeOfDay = 2600; // cap at 2:00 AM
 
                 Game1.exitActiveMenu();
             }

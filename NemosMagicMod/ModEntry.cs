@@ -87,7 +87,15 @@ namespace NemosMagicMod
             // Spell selection menu key
             if (e.Button == Config.SpellSelectionKey)
             {
-                Game1.activeClickableMenu = new SpellSelectionMenu(Helper, Monitor);
+                Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
+                if (spellbook != null)
+                {
+                    Game1.activeClickableMenu = new SpellSelectionMenu(Helper, Monitor, spellbook);
+                }
+                else
+                {
+                    Game1.showRedMessage("You don't have a Spellbook!");
+                }
                 return;
             }
 
