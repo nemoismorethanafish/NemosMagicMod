@@ -19,7 +19,7 @@ namespace NemosMagicMod.Spells
                 name: "Fireball",
                 description: "Throws a fiery explosive projectile.",
                 manaCost: 5,
-                experienceGained: 10
+                experienceGained: 1
             )
         {
             if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id))

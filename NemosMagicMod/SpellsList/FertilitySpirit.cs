@@ -29,7 +29,7 @@ namespace NemosMagicMod.Spells
 
 
         public FertilitySpirit()
-            : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 15)
+            : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 75, 100)
         { }
 
         protected override bool FreezePlayerDuringCast => true;

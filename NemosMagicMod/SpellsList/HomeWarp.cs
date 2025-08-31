@@ -15,7 +15,7 @@ namespace NemosMagicMod.Spells
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
         public HomeWarp()
-            : base("nemo.HomeWarp", "Home Warp", "Teleports you safely to your farmhouse.", 50)
+            : base("nemo.HomeWarp", "Home Warp", "Teleports you safely to your farmhouse.", 50, 50)
         {
         }
 

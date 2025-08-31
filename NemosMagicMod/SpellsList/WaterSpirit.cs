@@ -64,7 +64,7 @@ namespace NemosMagicMod.Spells
         public WaterSpirit()
             : base("water_spirit", "Water Spirit",
                   "Summons a friendly rain cloud that waters nearby crops.",
-                  20, 40)
+                  30, 25)
         {
             cloudTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/raincloud.png");
             splashTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/WaterSplash.png");

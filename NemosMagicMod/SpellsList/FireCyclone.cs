@@ -25,7 +25,7 @@ public class FireCyclone : Spell, Spell.IRenderable
             id: "nemo.FireCyclone",
             name: "Fire Cyclone",
             description: "Create a swirling fire cyclone around you, pushing enemies away.",
-            manaCost: 50
+            manaCost: 75
         )
     { }
 

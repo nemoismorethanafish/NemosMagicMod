@@ -54,7 +54,7 @@ public class EarthSpirit : Spell, IRenderable
     public EarthSpirit()
         : base("nemo.EarthSpirit", "Earth Spirit",
               "Summons a magical pickaxe that mines rocks. Duration increases with spellbook tier.",
-              30, 50)
+              30, 25)
     {
         pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
         pickaxe = new Pickaxe(); // vanilla tool instance

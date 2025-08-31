@@ -43,7 +43,7 @@ public class TreeSpirit : Spell, IRenderable
     public TreeSpirit()
         : base("spirit_tree", "Tree Spirit",
               "Summons a magical axe that chops trees.",
-              30, 50, false) // <-- fixed constructor
+              30, 25, false) // <-- fixed constructor
     {
         axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
     }

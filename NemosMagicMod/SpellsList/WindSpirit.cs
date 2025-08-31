@@ -18,7 +18,7 @@ namespace NemosMagicMod.Spells
                 "Wind Spirit",
                 "Temporarily increases your movement speed.",
                 50,
-                75
+                10
               )
         { }
 
