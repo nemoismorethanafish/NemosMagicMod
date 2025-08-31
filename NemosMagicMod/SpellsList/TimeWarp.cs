@@ -12,14 +12,16 @@ namespace NemosMagicMod.Spells
         private const int EarliestTime = 600; // 6:00 AM
         private const int MinimumCastTime = 700; // must be at least 7:00 AM
         private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
+        protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
+
 
         // Tier-based rewind amounts in minutes (converted to game time units)
         private readonly Dictionary<SpellbookTier, int> tierRewindAmounts = new()
         {
-            { SpellbookTier.Novice, 100 },     // 10 minutes
-            { SpellbookTier.Apprentice, 300 }, // 30 minutes
-            { SpellbookTier.Adept, 600 },      // 1 hour
-            { SpellbookTier.Master, 1200 }     // 2 hours
+            { SpellbookTier.Novice, 200 },     // 10 minutes
+            { SpellbookTier.Apprentice, 200 }, // 30 minutes
+            { SpellbookTier.Adept, 200 },      // 1 hour
+            { SpellbookTier.Master, 300 }     // 2 hours
         };
 
         public TimeWarp()
@@ -35,10 +37,11 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            // --- Minimum spellbook tier check (optional) ---
+            // --- Minimum spellbook tier check ---
             if (!HasSufficientSpellbookTier(who))
             {
-                Game1.showRedMessage($"Requires {MinimumTier} spellbook or higher!");
+                string requiredTierName = MinimumTier.ToString();
+                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
                 return;
             }
 
@@ -69,9 +72,8 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // --- Spend mana and grant XP immediately ---
-            ManaManager.SpendMana(ManaCost);
-            base.GrantExperience(who);
+            base.Cast(who);
+
 
             // Determine the rewind amount based on the player's spellbook tier
             SpellbookTier tier = GetCurrentSpellbookTier(who);
@@ -80,8 +82,10 @@ namespace NemosMagicMod.Spells
             // --- Delay the actual time rewind and effects by 1 second ---
             DelayedAction.functionAfterDelay(() =>
             {
-                // Rewind time
+                // Rewind time (naive, old method)
                 Game1.timeOfDay -= rewindAmount;
+
+                // Clamp to earliest allowed time
                 if (Game1.timeOfDay < EarliestTime)
                     Game1.timeOfDay = EarliestTime;
 
@@ -96,7 +100,7 @@ namespace NemosMagicMod.Spells
                 // Record last cast day
                 who.modData[LastCastKey] = todayId.ToString();
 
-            }, 1000); // 1 second delay
+            }, 1000);
         }
 
         private void AddSwirlEffect(Farmer who)
