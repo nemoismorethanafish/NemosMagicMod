@@ -1,11 +1,14 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
-using StardewValley;
-using StardewValley.TerrainFeatures;
+using SpaceCore;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewValley;
+using StardewValley.TerrainFeatures;
 using static SpellRegistry;
+using System.Linq;
+
 
 namespace NemosMagicMod.Spells
 {
@@ -15,6 +18,15 @@ namespace NemosMagicMod.Spells
         private const int ParticleCount = 12;
         private const string LastCastKey = "NemosMagicMod.FertilitySpirit.LastCastDay";
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
+
+        private int GetProfessionId(string skillId, string professionId)
+        {
+            return Skills.GetSkill(skillId)
+                         .Professions
+                         .Single(p => p.Id == professionId)
+                         .GetVanillaId();
+        }
+
 
         public FertilitySpirit()
             : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 15)
@@ -32,21 +44,30 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // Generate a unique ID for today
+            // --- Generate unique day ID ---
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
+            // --- Check normal cast ---
+            bool normalUsedToday = who.modData.TryGetValue(LastCastKey, out string lastDayStr)
+                                   && int.TryParse(lastDayStr, out int lastDay)
+                                   && lastDay == todayId;
 
-            // Check if already cast today
-            if (who.modData.TryGetValue(LastCastKey, out string lastDayStr) && int.TryParse(lastDayStr, out int lastDay))
+            // --- Check Bonus Daily cast ---
+            int bonusDailyId = GetProfessionId(ModEntry.SkillID, "BonusDaily");
+            bool hasBonusDaily = who.professions.Contains(bonusDailyId);
+            bool bonusUsedToday = who.modData.TryGetValue($"{LastCastKey}.BonusDailyUsed", out string usedStr)
+                                  && int.TryParse(usedStr, out int usedDay)
+                                  && usedDay == todayId;
+
+            // --- Block if both normal and bonus are spent ---
+            if (normalUsedToday && (!hasBonusDaily || bonusUsedToday))
             {
-                if (lastDay == todayId)
-                {
-                    Game1.showRedMessage("Fertility Spirit can only be cast once per day!");
-                    return;
-                }
+                Game1.showRedMessage("Fertility Spirit can only be cast once per day!");
+                return;
             }
+
             // --- Not Enough Mana check ---
-            if (who.Stamina < this.ManaCost) // or however your mod tracks mana
+            if (who.Stamina < this.ManaCost)
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
@@ -55,8 +76,15 @@ namespace NemosMagicMod.Spells
             // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
 
-            // Record that spell was cast today immediately
-            who.modData[LastCastKey] = todayId.ToString();
+            // --- Record usage ---
+            if (!normalUsedToday)
+            {
+                who.modData[LastCastKey] = todayId.ToString(); // spend normal cast
+            }
+            else if (hasBonusDaily && !bonusUsedToday)
+            {
+                who.modData[$"{LastCastKey}.BonusDailyUsed"] = todayId.ToString(); // spend bonus cast
+            }
 
             // --- Delayed custom effects ---
             DelayedAction.functionAfterDelay(() =>
@@ -70,7 +98,8 @@ namespace NemosMagicMod.Spells
                     {
                         Vector2 tile = playerTile + new Vector2(x, y);
 
-                        if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature feature) && feature is HoeDirt dirt && dirt.crop != null)
+                        if (location.terrainFeatures.TryGetValue(tile, out TerrainFeature feature)
+                            && feature is HoeDirt dirt && dirt.crop != null)
                         {
                             var crop = dirt.crop;
                             if (crop.currentPhase.Value < crop.phaseDays.Count - 1)
@@ -94,7 +123,6 @@ namespace NemosMagicMod.Spells
                 }
 
                 Game1.playSound("yoba");
-
             }, 1000); // 1-second delay
         }
 

@@ -1,9 +1,11 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using SpaceCore;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace NemosMagicMod.Spells
 {
@@ -13,6 +15,14 @@ namespace NemosMagicMod.Spells
         private const int MinimumCastTime = 700; // must be at least 7:00 AM
         private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
+
+        private int GetProfessionId(string skillId, string professionId)
+        {
+            return Skills.GetSkill(skillId)
+                         .Professions
+                         .Single(p => p.Id == professionId)
+                         .GetVanillaId();
+        }
 
 
         // Tier-based rewind amounts in minutes (converted to game time units)
@@ -45,17 +55,26 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // Generate unique day ID
+            // --- Generate unique day ID ---
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
-            // --- Once-per-day check ---
-            if (who.modData.TryGetValue(LastCastKey, out string lastDayStr) && int.TryParse(lastDayStr, out int lastDay))
+            // --- Check normal cast ---
+            bool normalUsedToday = who.modData.TryGetValue(LastCastKey, out string lastDayStr)
+                                   && int.TryParse(lastDayStr, out int lastDay)
+                                   && lastDay == todayId;
+
+            // --- Check Bonus Daily cast ---
+            int bonusDailyId = GetProfessionId(SkillID, "BonusDaily");
+            bool hasBonusDaily = Game1.player.professions.Contains(bonusDailyId);
+            bool bonusUsedToday = who.modData.TryGetValue("NemosMagicMod.TimeWarp.BonusDailyUsed", out string usedStr)
+                                  && int.TryParse(usedStr, out int usedDay)
+                                  && usedDay == todayId;
+
+            // --- Block if both normal and bonus are spent ---
+            if (normalUsedToday && (!hasBonusDaily || bonusUsedToday))
             {
-                if (lastDay == todayId)
-                {
-                    Game1.showRedMessage("Time Warp can only be cast once per day!");
-                    return;
-                }
+                Game1.showRedMessage("Time Warp can only be cast once per day!");
+                return;
             }
 
             // --- Not Enough Mana check ---
@@ -72,20 +91,18 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
+            // --- Base cast (spends mana, triggers standard effects) ---
             base.Cast(who);
 
-
-            // Determine the rewind amount based on the player's spellbook tier
+            // --- Determine the rewind amount based on the player's spellbook tier ---
             SpellbookTier tier = GetCurrentSpellbookTier(who);
             int rewindAmount = tierRewindAmounts.GetValueOrDefault(tier, 100); // default 10 min
 
             // --- Delay the actual time rewind and effects by 1 second ---
             DelayedAction.functionAfterDelay(() =>
             {
-                // Rewind time (naive, old method)
+                // Rewind time
                 Game1.timeOfDay -= rewindAmount;
-
-                // Clamp to earliest allowed time
                 if (Game1.timeOfDay < EarliestTime)
                     Game1.timeOfDay = EarliestTime;
 
@@ -97,8 +114,15 @@ namespace NemosMagicMod.Spells
                 // Swirl particle effects
                 AddSwirlEffect(who);
 
-                // Record last cast day
-                who.modData[LastCastKey] = todayId.ToString();
+                // --- Record cast usage ---
+                if (!normalUsedToday)
+                {
+                    who.modData[LastCastKey] = todayId.ToString(); // spend normal cast
+                }
+                else if (hasBonusDaily && !bonusUsedToday)
+                {
+                    who.modData["NemosMagicMod.TimeWarp.BonusDailyUsed"] = todayId.ToString(); // spend bonus cast
+                }
 
             }, 1000);
         }
