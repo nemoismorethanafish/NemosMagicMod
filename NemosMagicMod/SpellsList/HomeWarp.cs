@@ -12,6 +12,7 @@ namespace NemosMagicMod.Spells
     public class HomeWarp : Spell, Spell.IRenderable
     {
         private const int FadeDuration = 1000; // milliseconds
+        protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
         public HomeWarp()
             : base("nemo.HomeWarp", "Home Warp", "Teleports you safely to your farmhouse.", 50)
@@ -27,6 +28,14 @@ namespace NemosMagicMod.Spells
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
+            }
+
+            // --- Minimum spellbook tier check ---
+            if (!HasSufficientSpellbookTier(who))
+            {
+                string requiredTierName = MinimumTier.ToString(); // "Adept"
+                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+                return; // Cancel spell
             }
 
             // Check if already home BEFORE spending mana

@@ -32,13 +32,33 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // --- Spend mana / base cast immediately ---
+            // --- Base cast ---
             base.Cast(who);
 
-            // --- Delay the actual buff application ---
+            // --- Determine tier-based values ---
+            SpellbookTier tier = GetCurrentSpellbookTier(who);
+            int durationMs = tier switch
+            {
+                SpellbookTier.Novice => 60_000,
+                SpellbookTier.Apprentice => 90_000,
+                SpellbookTier.Adept => 120_000,
+                SpellbookTier.Master => 180_000,
+                _ => 60_000
+            };
+
+            float speedBuff = tier switch
+            {
+                SpellbookTier.Novice => 0.25f,
+                SpellbookTier.Apprentice => 0.5f,
+                SpellbookTier.Adept => 0.75f,
+                SpellbookTier.Master => 1.0f,
+                _ => 0.25f
+            };
+
+            // --- Apply buff after 1 second delay ---
             DelayedAction.functionAfterDelay(() =>
             {
-                // Remove existing buff with the same ID to replace it
+                // Remove existing Wind Spirit buff
                 if (who.buffs.IsApplied(BuffId))
                     who.buffs.Remove(BuffId);
 
@@ -49,15 +69,15 @@ namespace NemosMagicMod.Spells
                     displayName: "Wind Spirit",
                     iconTexture: icon,
                     iconSheetIndex: 0,
-                    duration: DurationMs,
-                    effects: new BuffEffects { Speed = { Value = SpeedIncrease / 4 } },
-                    description: "You feel lighter on your feet!"
+                    duration: durationMs,
+                    effects: new BuffEffects { Speed = { Value = speedBuff } },
+                    description: $"You feel lighter on your feet! (+{speedBuff} speed for {durationMs / 1000}s)"
                 );
 
                 who.buffs.Apply(buff);
-                ModEntry.Instance.Monitor.Log($"Wind Spirit buff applied (+{SpeedIncrease} speed, {DurationMs / 1000}s)", LogLevel.Info);
+                ModEntry.Instance.Monitor.Log($"Wind Spirit buff applied (+{speedBuff} speed, {durationMs / 1000}s)", LogLevel.Info);
 
-            }, 1000); // 1-second delay
+            }, 1000);
         }
     }
 }

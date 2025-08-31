@@ -3,21 +3,30 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using System;
+using System.Collections.Generic;
 
 namespace NemosMagicMod.Spells
 {
     public class TimeWarp : Spell
     {
-        private const int RewindAmount = 100; // 10 minutes
         private const int EarliestTime = 600; // 6:00 AM
         private const int MinimumCastTime = 700; // must be at least 7:00 AM
         private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
+
+        // Tier-based rewind amounts in minutes (converted to game time units)
+        private readonly Dictionary<SpellbookTier, int> tierRewindAmounts = new()
+        {
+            { SpellbookTier.Novice, 100 },     // 10 minutes
+            { SpellbookTier.Apprentice, 300 }, // 30 minutes
+            { SpellbookTier.Adept, 600 },      // 1 hour
+            { SpellbookTier.Master, 1200 }     // 2 hours
+        };
 
         public TimeWarp()
             : base(
                   id: "nemo.TimeWarp",
                   name: "Time Warp",
-                  description: "Bend time backwards by 1 hour, never earlier than 6:00 AM. Can only be cast once per day.",
+                  description: "Bend time backwards. Can only be cast once per day.",
                   manaCost: 15,
                   experienceGained: 25,
                   isActive: false)
@@ -26,6 +35,13 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
+            // --- Minimum spellbook tier check (optional) ---
+            if (!HasSufficientSpellbookTier(who))
+            {
+                Game1.showRedMessage($"Requires {MinimumTier} spellbook or higher!");
+                return;
+            }
+
             // Generate unique day ID
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
@@ -57,11 +73,15 @@ namespace NemosMagicMod.Spells
             ManaManager.SpendMana(ManaCost);
             base.GrantExperience(who);
 
+            // Determine the rewind amount based on the player's spellbook tier
+            SpellbookTier tier = GetCurrentSpellbookTier(who);
+            int rewindAmount = tierRewindAmounts.GetValueOrDefault(tier, 100); // default 10 min
+
             // --- Delay the actual time rewind and effects by 1 second ---
             DelayedAction.functionAfterDelay(() =>
             {
                 // Rewind time
-                Game1.timeOfDay -= RewindAmount;
+                Game1.timeOfDay -= rewindAmount;
                 if (Game1.timeOfDay < EarliestTime)
                     Game1.timeOfDay = EarliestTime;
 
