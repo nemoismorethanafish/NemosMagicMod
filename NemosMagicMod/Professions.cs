@@ -41,3 +41,47 @@ public static class Level5Professions
         }
     }
 }
+public static class Level10Professions
+{
+    public class ManaRegeneration : Skill.Profession
+    {
+        public ManaRegeneration(Skill parentSkill)
+            : base(parentSkill, "ManaRegeneration") { }
+
+        public override string GetName() => "Mana Regeneration";
+        public override string GetDescription() => "Regenerate 1 Mana per second.";
+
+        public override void DoImmediateProfessionPerk()
+        {
+            // Functionality to be implemented later
+        }
+    }
+
+    public class WarWizard : Skill.Profession
+    {
+        public WarWizard(Skill parentSkill)
+            : base(parentSkill, "WarWizard") { }
+
+        public override string GetName() => "War Wizard";
+        public override string GetDescription() => "Grants a unique, powerful spell.";
+
+        public override void DoImmediateProfessionPerk()
+        {
+            // Functionality to be implemented later
+        }
+    }
+
+    public class BonusDaily : Skill.Profession
+    {
+        public BonusDaily(Skill parentSkill)
+            : base(parentSkill, "BonusDaily") { }
+
+        public override string GetName() => "Bonus Daily";
+        public override string GetDescription() => "Allows you to ignore the once-per-day restriction… once per day.";
+
+        public override void DoImmediateProfessionPerk()
+        {
+            // Functionality to be implemented later
+        }
+    }
+}

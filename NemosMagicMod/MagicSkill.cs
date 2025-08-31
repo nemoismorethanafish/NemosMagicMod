@@ -10,25 +10,44 @@ namespace MagicSkill
         public Magic_Skill()
             : base("nemosmagicmod.Magic")
         {
+            // Experience per level
             this.ExperienceCurve = new int[]
             {
                 100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000
             };
 
+            // Icons
             Texture2D icon = NemosMagicMod.ModEntry.MagicSkillIcon;
             this.Icon = icon;
             this.SkillsPageIcon = icon;
 
-            // Create the professions from Level5Professions
-            var prof1 = new Level5Professions.ArcaneMaster(this);
-            var prof2 = new Level5Professions.BattleMage(this);
+            // -----------------------------
+            // Level 5 professions
+            // -----------------------------
+            var arcaneMaster = new Level5Professions.ArcaneMaster(this);
+            var battleMage = new Level5Professions.BattleMage(this);
 
-            // Add the profession pair at level 5
-            this.ProfessionsForLevels.Add(new ProfessionPair(5, prof1, prof2, null));
+            this.ProfessionsForLevels.Add(new ProfessionPair(5, arcaneMaster, battleMage, null));
+            this.Professions.Add(arcaneMaster);
+            this.Professions.Add(battleMage);
 
-            // Add the individual professions to the skill
-            this.Professions.Add(prof1);
-            this.Professions.Add(prof2);
+            // -----------------------------
+            // Level 10 professions
+            // -----------------------------
+            var manaRegen = new Level10Professions.ManaRegeneration(this);
+            var warWizard = new Level10Professions.WarWizard(this);
+            var bonusDaily = new Level10Professions.BonusDaily(this);
+
+            // ArcaneMaster → ManaRegeneration or BonusDaily
+            this.ProfessionsForLevels.Add(new ProfessionPair(10, manaRegen, bonusDaily, arcaneMaster));
+
+            // BattleMage → WarWizard or BonusDaily
+            this.ProfessionsForLevels.Add(new ProfessionPair(10, warWizard, bonusDaily, battleMage));
+
+            // Add to Professions list
+            this.Professions.Add(manaRegen);
+            this.Professions.Add(warWizard);
+            this.Professions.Add(bonusDaily);
         }
 
         public override string GetName() => "Magic";
