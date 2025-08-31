@@ -1,9 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
+using NemosMagicMod.Spells;
 using SpaceCore;
-using StardewValley;
 using StardewModdingAPI.Events;
+using StardewValley;
 using static SpellRegistry;
 
 public abstract class Spell
@@ -12,6 +13,9 @@ public abstract class Spell
 
     protected virtual bool FreezePlayerDuringCast => true;
     protected virtual bool UseBookAnimation => true;
+
+    // Add minimum required tier for this spell
+    protected virtual SpellbookTier MinimumTier => SpellbookTier.Novice;
 
     public string Id { get; }
     public string Name { get; }
@@ -39,9 +43,57 @@ public abstract class Spell
 
     public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this);
 
+    /// <summary>
+    /// Gets the current spellbook tier from the player's inventory
+    /// </summary>
+    protected SpellbookTier GetCurrentSpellbookTier(Farmer who)
+    {
+        // Check the currently equipped tool first
+        if (who.CurrentTool is Spellbook equippedSpellbook)
+        {
+            return equippedSpellbook.Tier;
+        }
+
+        // If no spellbook is equipped, find the highest tier spellbook in inventory
+        SpellbookTier highestTier = SpellbookTier.Novice;
+        bool foundSpellbook = false;
+
+        foreach (var item in who.Items)
+        {
+            if (item is Spellbook spellbook)
+            {
+                foundSpellbook = true;
+                if (spellbook.Tier > highestTier)
+                {
+                    highestTier = spellbook.Tier;
+                }
+            }
+        }
+
+        // Return the highest tier found, or Novice if no spellbook exists
+        return foundSpellbook ? highestTier : SpellbookTier.Novice;
+    }
+
+    /// <summary>
+    /// Checks if the player has a spellbook of sufficient tier to cast this spell
+    /// </summary>
+    protected bool HasSufficientSpellbookTier(Farmer who)
+    {
+        var currentTier = GetCurrentSpellbookTier(who);
+        return currentTier >= MinimumTier;
+    }
+
     /// <summary>Cast spell: animation happens first, then spell effects</summary>
     public virtual void Cast(Farmer who)
     {
+        // Check if player has a spellbook of sufficient tier
+        if (!HasSufficientSpellbookTier(who))
+        {
+            string requiredTierName = MinimumTier.ToString();
+            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            return;
+        }
+
         if (!ManaManager.HasEnoughMana(ManaCost))
         {
             Game1.showRedMessage("Not enough mana!");
@@ -63,14 +115,6 @@ public abstract class Spell
 
     private void ApplySpellEffects(Farmer who)
     {
-        foreach (var spell in ModEntry.ActiveSpells)
-        {
-            spell.IsActive = false;
-            if (spell is IRenderable r)
-                r.Unsubscribe();
-        }
-        ModEntry.ActiveSpells.Clear();
-
         ManaManager.SpendMana(ManaCost);
         GrantExperience(who);
 

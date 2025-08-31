@@ -9,6 +9,7 @@ using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using static Spell;
 
@@ -16,10 +17,27 @@ namespace NemosMagicMod.Spells
 {
     public class SeaSpirit : Spell, IRenderable
     {
-        private const float BubbleDuration = 30f;
+        private const float BaseBubbleDuration = 30f;
         private const int BubbleRadius = 5;
         private const float BubbleRiseSpeed = 60f;
         private const float BubbleFadeSpeed = 0.6f;
+
+        // Tier-based scaling factors
+        private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
+        {
+            { SpellbookTier.Novice, 1.0f },     // 30 seconds base
+            { SpellbookTier.Apprentice, 1.5f }, // 45 seconds
+            { SpellbookTier.Adept, 2.0f },      // 60 seconds
+            { SpellbookTier.Master, 2.5f }      // 75 seconds
+        };
+
+        private readonly Dictionary<SpellbookTier, int> bubbleLocationCounts = new()
+        {
+            { SpellbookTier.Novice, 1 },      // 1 bubble location
+            { SpellbookTier.Apprentice, 3 },  // 2 bubble locations
+            { SpellbookTier.Adept, 6 },       // 3 bubble locations
+            { SpellbookTier.Master, 9 }       // 4 bubble locations
+        };
 
         private Texture2D bubbleTexture;
         private bool subscribedDraw = false;
@@ -27,9 +45,13 @@ namespace NemosMagicMod.Spells
         public IReadOnlyList<Bubble> Bubbles => bubbles.AsReadOnly();
 
         private float bubbleTimer = 0f;
+        private float currentSpellDuration = BaseBubbleDuration;
+
+        // Override minimum tier requirement
+        protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
 
         public SeaSpirit()
-            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 25)
+            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates. Duration and coverage increase with spellbook tier.", 25)
         {
             bubbleTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/bubbles.png");
             ApplyHarmonyPatches();
@@ -67,8 +89,35 @@ namespace NemosMagicMod.Spells
             }
         }
 
+        /// <summary>
+        /// Calculates the spell duration based on the current spellbook tier
+        /// </summary>
+        private float GetTierAdjustedDuration(Farmer who)
+        {
+            var currentTier = GetCurrentSpellbookTier(who);
+            var multiplier = durationMultipliers.GetValueOrDefault(currentTier, 1.0f);
+            return BaseBubbleDuration * multiplier;
+        }
+
+        /// <summary>
+        /// Gets the number of bubble locations based on the current spellbook tier
+        /// </summary>
+        private int GetTierAdjustedBubbleLocations(Farmer who)
+        {
+            var currentTier = GetCurrentSpellbookTier(who);
+            return bubbleLocationCounts.GetValueOrDefault(currentTier, 1);
+        }
+
         public override void Cast(Farmer who)
         {
+            // Check spellbook tier requirement
+            if (!HasSufficientSpellbookTier(who))
+            {
+                string requiredTierName = MinimumTier.ToString();
+                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+                return;
+            }
+
             // --- Not Enough Mana check ---
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
@@ -76,17 +125,47 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // --- Base cast (spends mana, triggers standard effects) ---
+            // Calculate tier-based values
+            var currentTier = GetCurrentSpellbookTier(who);
+            currentSpellDuration = GetTierAdjustedDuration(who);
+            var bubbleLocationCount = GetTierAdjustedBubbleLocations(who);
+
             base.Cast(who);
+
+            // Show tier-specific message
+            var durationSeconds = (int)currentSpellDuration;
+            Game1.addHUDMessage(new HUDMessage($"Sea Spirit: {durationSeconds}s, {bubbleLocationCount} location(s) ({currentTier} tier)", 2));
+
+            // Set timer to activate the spell (this makes IsActive return true)
+            bubbleTimer = currentSpellDuration;
+            ModEntry.RegisterActiveSpell(this);
 
             // --- Delay the custom bubble effects ---
             DelayedAction.functionAfterDelay(() =>
             {
+                // Only reset OTHER active spells, not this one
+                foreach (var spell in ModEntry.ActiveSpells.ToList())
+                {
+                    if (spell != this) // Don't deactivate ourselves
+                    {
+                        if (spell is IRenderable renderable)
+                            renderable.Unsubscribe();
+                        spell.IsActive = false;
+                    }
+                }
+
+                // Clean up any existing SeaSpirit subscription first
+                if (subscribedDraw)
+                {
+                    Unsubscribe();
+                }
+
                 bubbles.Clear();
 
                 GameLocation location = who.currentLocation;
                 Vector2 playerTile = new((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
 
+                // Find all valid water tiles
                 List<Vector2> validTiles = new();
                 for (int x = -BubbleRadius; x <= BubbleRadius; x++)
                 {
@@ -98,63 +177,87 @@ namespace NemosMagicMod.Spells
                     }
                 }
 
-                int numBubbles = 8; // number of simultaneous bubbles
+                // Select multiple bubble locations based on tier
                 if (validTiles.Count > 0)
                 {
-                    Vector2 chosenTile = validTiles[Game1.random.Next(validTiles.Count)];
-                    for (int i = 0; i < numBubbles; i++)
-                        bubbles.Add(new Bubble(chosenTile));
+                    List<Vector2> selectedTiles = new();
+
+                    // Shuffle the valid tiles to ensure random selection
+                    var shuffledTiles = validTiles.OrderBy(x => Game1.random.Next()).ToList();
+
+                    // Select unique bubble locations up to the tier limit
+                    int locationsToSelect = Math.Min(bubbleLocationCount, shuffledTiles.Count);
+                    for (int i = 0; i < locationsToSelect; i++)
+                    {
+                        selectedTiles.Add(shuffledTiles[i]);
+                    }
+
+                    // Debug log for troubleshooting
+                    ModEntry.Instance.Monitor.Log($"SeaSpirit: Selected {selectedTiles.Count} locations out of {validTiles.Count} valid tiles", LogLevel.Debug);
+
+                    // Create bubbles for each selected location
+                    int bubblesPerLocation = 8; // number of simultaneous bubbles per location
+                    foreach (var tile in selectedTiles)
+                    {
+                        for (int i = 0; i < bubblesPerLocation; i++)
+                        {
+                            bubbles.Add(new Bubble(tile));
+                        }
+                    }
+
+                    ModEntry.Instance.Monitor.Log($"SeaSpirit: Created {bubbles.Count} total bubbles", LogLevel.Debug);
                 }
 
-                bubbleTimer = BubbleDuration;
+                bubbleTimer = currentSpellDuration;
                 SubscribeDraw();
 
-                Game1.showGlobalMessage($"Sea Spirit activated! Fishing bite rate increased for {BubbleDuration} seconds.");
+                Game1.showGlobalMessage($"Sea Spirit activated! Fishing bite rate increased for {(int)currentSpellDuration} seconds.");
 
             }, 1000); // 1-second delay
         }
 
-        public override void Update(GameTime gameTime, Farmer who)
+        public void Update(float dt)
         {
-            if (bubbleTimer > 0f)
+            for (int i = 0; i < bubbles.Count; i++)
             {
-                float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-                bubbleTimer -= dt;
+                var b = bubbles[i];
 
-                foreach (var b in bubbles)
+                if (!b.Active)
                 {
-                    if (!b.Active)
-                    {
-                        b.StartDelay -= dt;
-                        if (b.StartDelay <= 0f)
-                            b.Active = true;
-                        else
-                            continue;
-                    }
-
-                    b.PixelPos.Y -= b.RiseSpeed * dt;
-                    b.PixelPos.X += b.DriftSpeed * dt;
-
-                    float maxOffset = Game1.tileSize / 2f;
-                    if (b.PixelPos.X > b.Tile.X * Game1.tileSize + maxOffset || b.PixelPos.X < b.Tile.X * Game1.tileSize - maxOffset)
-                        b.DriftSpeed *= -1f;
-
-                    b.Opacity -= BubbleFadeSpeed * dt;
-
-                    if (b.Opacity <= 0f)
-                    {
-                        b.PixelPos = b.Tile * Game1.tileSize + new Vector2(Game1.random.Next(-4, 5), 0);
-                        b.Opacity = 1f;
-                        b.Active = false;
-                        b.StartDelay = (float)Game1.random.NextDouble() * 1f;
-                    }
+                    b.StartDelay -= dt;
+                    if (b.StartDelay <= 0f)
+                        b.Active = true;
+                    continue;
                 }
 
-                if (bubbleTimer <= 0f)
-                    Unsubscribe();
-            }
+                // movement
+                b.PixelPos.Y -= b.RiseSpeed * dt;
+                b.PixelPos.X += b.DriftSpeed * dt;
 
-            HandleFishingBiteRate();
+                // bounce horizontally within tile bounds
+                float maxOffset = Game1.tileSize / 2f;
+                if (b.PixelPos.X > b.Tile.X * Game1.tileSize + maxOffset || b.PixelPos.X < b.Tile.X * Game1.tileSize - maxOffset)
+                    b.DriftSpeed *= -1f;
+
+                // clamp to prevent runaway drift
+                b.DriftSpeed = MathHelper.Clamp(b.DriftSpeed, -20f, 20f);
+
+                // fade out as it rises
+                b.Opacity -= 0.25f * dt;
+
+                if (b.Opacity <= 0f)
+                {
+                    // reset bubble like constructor
+                    b.PixelPos = b.Tile * Game1.tileSize + new Vector2(Game1.random.Next(-4, 5), 0);
+                    b.Opacity = 1f;
+                    b.Active = false;
+                    b.StartDelay = (float)Game1.random.NextDouble() * 1f;
+
+                    // reset velocity
+                    b.RiseSpeed = BubbleRiseSpeed * (0.8f + (float)Game1.random.NextDouble() * 0.4f);
+                    b.DriftSpeed = ((float)Game1.random.NextDouble() - 0.5f) * 20f;
+                }
+            }
         }
 
         private void SubscribeDraw()

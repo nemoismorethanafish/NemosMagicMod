@@ -1,15 +1,16 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
+using NemosMagicMod.Spells;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Tools;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using static Spell;
 
-
 //Pickaxe got stuck hovering on a rock. Need to adjust 
-
 
 public class EarthSpirit : Spell, IRenderable
 {
@@ -21,8 +22,17 @@ public class EarthSpirit : Spell, IRenderable
     private readonly float moveSpeed = 256f;
 
     private float spellTimer = 0f;
-    private readonly float spellDuration = 20f;
+    private float spellDuration = 20f; // Base duration - will be modified by tier
     private readonly float hoverHeight = 32f;
+
+    // Tier-based duration multipliers
+    private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
+    {
+        { SpellbookTier.Novice, 1.0f },     // 20 seconds base
+        { SpellbookTier.Apprentice, 1.5f }, // 30 seconds
+        { SpellbookTier.Adept, 2.0f },      // 40 seconds
+        { SpellbookTier.Master, 2.5f }      // 50 seconds
+    };
 
     public bool IsActive { get; private set; }
 
@@ -38,9 +48,12 @@ public class EarthSpirit : Spell, IRenderable
     private bool isReturning = false;
     private Farmer owner;
 
+    // Override minimum tier requirement
+    protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
+
     public EarthSpirit()
         : base("nemo.EarthSpirit", "Earth Spirit",
-              "Summons a magical pickaxe that mines rocks.",
+              "Summons a magical pickaxe that mines rocks. Duration increases with spellbook tier.",
               30, 50)
     {
         pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
@@ -56,13 +69,38 @@ public class EarthSpirit : Spell, IRenderable
         subscribed = false;
     }
 
+    /// <summary>
+    /// Calculates the spell duration based on the current spellbook tier
+    /// </summary>
+    private float GetTierAdjustedDuration(Farmer who)
+    {
+        var currentTier = GetCurrentSpellbookTier(who);
+        var multiplier = durationMultipliers.GetValueOrDefault(currentTier, 1.0f);
+        return 20f * multiplier; // Base 20 seconds * tier multiplier
+    }
+
     public override void Cast(Farmer who)
     {
+        if (!HasSufficientSpellbookTier(who))
+        {
+            string requiredTierName = MinimumTier.ToString();
+            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            return;
+        }
+
         if (!ManaManager.HasEnoughMana(ManaCost))
         {
             Game1.showRedMessage("Not enough mana!");
             return;
         }
+
+        // Set duration based on current spellbook tier
+        spellDuration = GetTierAdjustedDuration(who);
+
+        // Show tier-specific message
+        var currentTier = GetCurrentSpellbookTier(who);
+        var durationSeconds = (int)spellDuration;
+        Game1.addHUDMessage(new HUDMessage($"Earth Spirit summoned for {durationSeconds}s ({currentTier} tier)", 2));
 
         // Immediate base.Cast: mana, XP, spell activation
         base.Cast(who);
@@ -72,27 +110,34 @@ public class EarthSpirit : Spell, IRenderable
         {
             owner = who;
 
-            // Reset EarthSpirit state
-            foreach (var spell in ModEntry.ActiveSpells)
+            // Only reset OTHER active spells, not this one
+            foreach (var spell in ModEntry.ActiveSpells.ToList())
             {
-                if (spell is IRenderable renderable)
-                    renderable.Unsubscribe();
-
-                spell.IsActive = false;
+                if (spell != this) // Don't deactivate ourselves
+                {
+                    if (spell is IRenderable renderable)
+                        renderable.Unsubscribe();
+                    spell.IsActive = false;
+                }
             }
 
+            // Clean up any existing Earth Spirit subscription first
+            if (subscribed)
+            {
+                Unsubscribe();
+            }
+
+            // Initialize new Earth Spirit state
             IsActive = true;
             spellTimer = 0f;
             currentTargetTile = null;
             isReturning = false;
             toolPosition = who.Position + new Vector2(0, -64f);
 
-            if (!subscribed)
-            {
-                ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
-                ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
-                subscribed = true;
-            }
+            // Subscribe to events
+            ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
+            ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+            subscribed = true;
 
             Game1.playSound("hammer");
 
@@ -114,6 +159,13 @@ public class EarthSpirit : Spell, IRenderable
         {
             IsActive = false;
             Unsubscribe();
+
+            // Show completion message with tier info
+            if (owner != null)
+            {
+                var currentTier = GetCurrentSpellbookTier(owner);
+                Game1.addHUDMessage(new HUDMessage($"Earth Spirit dismissed ({currentTier} tier)", 1));
+            }
             return;
         }
 
@@ -213,7 +265,7 @@ public class EarthSpirit : Spell, IRenderable
         {
             float oldStamina = owner.stamina;
 
-            // Use the pickaxe’s DoFunction like a normal tool swing
+            // Use the pickaxe's DoFunction like a normal tool swing
             pickaxe.DoFunction(Game1.currentLocation, (int)tile.X * Game1.tileSize, (int)tile.Y * Game1.tileSize, 1, owner);
 
             // Prevent stamina drain
