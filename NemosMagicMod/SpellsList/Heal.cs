@@ -8,7 +8,7 @@ namespace NemosMagicMod.Spells
     {
         private const int HealAmount = 40;
 
-        public Heal() : base("nemo.Heal", "Heal", "Restores some health.", 5, 10000)
+        public Heal() : base("nemo.Heal", "Heal", "Fully restores health.", 30, 10)
         {
         }
 
