@@ -17,18 +17,20 @@ namespace NemosMagicMod.Spells
         private bool subscribed = false;
 
         private float spellTimer = 0f;
-        private readonly float spellDuration = 10f;
+        private float spellDuration = 10f; // now adjustable by tier
 
         private float wateringTimer = 0f;
         private readonly float wateringInterval = 1f;
 
         private Vector2 cloudPosition;
         private Vector2 cloudVelocity;
-        private readonly float cloudSpeed = 64f; // fallback speed if no crops
-        private readonly float cloudSeekSpeed = 64f; // pixels/sec toward crops
-        private readonly int seekRadius = 5; // tiles
+        private readonly float cloudSpeed = 64f;
+        private readonly float cloudSeekSpeed = 64f;
+        private readonly int seekRadius = 5;
 
         private Vector2? targetTile = null;
+
+        private Farmer owner;
 
         private class WaterSplash
         {
@@ -47,6 +49,18 @@ namespace NemosMagicMod.Spells
 
         public bool IsActive { get; private set; }
 
+        // Tier-based duration multipliers
+        private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
+    {
+        { SpellbookTier.Novice, 1.0f },
+        { SpellbookTier.Apprentice, 1.5f },
+        { SpellbookTier.Adept, 2.0f },
+        { SpellbookTier.Master, 2.5f }
+    };
+
+        // Minimum tier for the spell
+        protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
+
         public WaterSpirit()
             : base("water_spirit", "Water Spirit",
                   "Summons a friendly rain cloud that waters nearby crops.",
@@ -56,27 +70,44 @@ namespace NemosMagicMod.Spells
             splashTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/WaterSplash.png");
         }
 
+        private float GetTierAdjustedDuration(Farmer who)
+        {
+            var tier = GetCurrentSpellbookTier(who);
+            float multiplier = durationMultipliers.GetValueOrDefault(tier, 1f);
+            return 10f * multiplier; // base 10 seconds * tier multiplier
+        }
+
         public override void Cast(Farmer who)
         {
-            // --- Not Enough Mana check ---
+            if (!HasSufficientSpellbookTier(who))
+            {
+                Game1.showRedMessage($"Requires {MinimumTier} spellbook or higher!");
+                return;
+            }
+
             if (!ManaManager.HasEnoughMana(ManaCost))
             {
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
 
-            // --- Spend mana / base cast immediately ---
             base.Cast(who);
 
-            // --- Delay the actual cloud summoning and watering logic ---
+            // Apply tier-based duration
+            spellDuration = GetTierAdjustedDuration(who);
+
+            // Optionally show HUD message
+            Game1.addHUDMessage(new HUDMessage($"Water Spirit summoned for {(int)spellDuration}s", 2));
+
             DelayedAction.functionAfterDelay(() =>
             {
+                owner = who;
+
                 // Clear other active spells
                 foreach (var spell in ModEntry.ActiveSpells)
                 {
                     if (spell is IRenderable renderable)
                         renderable.Unsubscribe();
-
                     spell.IsActive = false;
                 }
 
@@ -88,7 +119,6 @@ namespace NemosMagicMod.Spells
 
                 cloudPosition = who.Position + new Vector2(0, -64f);
 
-                // Initial fallback velocity based on facing
                 switch (who.FacingDirection)
                 {
                     case 0: cloudVelocity = new Vector2(0, -cloudSpeed); break;
@@ -107,9 +137,8 @@ namespace NemosMagicMod.Spells
 
                 Game1.playSound("wateringCan");
 
-            }, 1000); // 1-second delay
+            }, 1000);
         }
-
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
             if (!IsActive)
@@ -137,17 +166,29 @@ namespace NemosMagicMod.Spells
                 {
                     direction.Normalize();
                     cloudPosition += direction * cloudSeekSpeed * deltaSeconds;
+                    cloudVelocity = direction * cloudSeekSpeed; // update velocity for scoring
                 }
                 else
                 {
                     WaterNearbyCrops();
                     targetTile = null;
+                    cloudVelocity = Vector2.Zero;
                 }
             }
-            else
+            else if (owner != null)
             {
-                // No crops nearby: move in fallback direction
-                cloudPosition += cloudVelocity * deltaSeconds;
+                // Return to player if no target
+                Vector2 direction = owner.Position - cloudPosition;
+                if (direction.LengthSquared() > 4f)
+                {
+                    direction.Normalize();
+                    cloudPosition += direction * cloudSeekSpeed * deltaSeconds;
+                    cloudVelocity = direction * cloudSeekSpeed; // update velocity
+                }
+                else
+                {
+                    cloudVelocity = Vector2.Zero;
+                }
             }
 
             // Water crops every interval (extra safety)

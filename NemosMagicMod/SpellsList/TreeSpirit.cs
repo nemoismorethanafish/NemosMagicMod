@@ -205,7 +205,7 @@ public class TreeSpirit : Spell, IRenderable
         if (owner == null) return;
 
         Axe axe = new();
-        Vector2 pixelPos = tile * Game1.tileSize;
+        Vector2 pixelPos = tile * Game1.tileSize + new Vector2(Game1.tileSize / 2, Game1.tileSize / 2);
         axe.DoFunction(Game1.currentLocation, (int)pixelPos.X, (int)pixelPos.Y, 1, owner);
     }
 

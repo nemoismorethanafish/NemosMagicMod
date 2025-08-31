@@ -110,17 +110,6 @@ public class EarthSpirit : Spell, IRenderable
         {
             owner = who;
 
-            // Only reset OTHER active spells, not this one
-            foreach (var spell in ModEntry.ActiveSpells.ToList())
-            {
-                if (spell != this) // Don't deactivate ourselves
-                {
-                    if (spell is IRenderable renderable)
-                        renderable.Unsubscribe();
-                    spell.IsActive = false;
-                }
-            }
-
             // Clean up any existing Earth Spirit subscription first
             if (subscribed)
             {
