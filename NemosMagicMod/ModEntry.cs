@@ -41,6 +41,7 @@ namespace NemosMagicMod
 
         private bool queuedWizardUpgrade = false;
         private Spellbook? queuedSpellbook = null;
+        public ModConfig Config { get; private set; } = null!;
 
         public override void Entry(IModHelper helper)
         {
@@ -72,6 +73,8 @@ namespace NemosMagicMod
             helper.Events.Display.MenuChanged += OnMenuChanged;
 
             Monitor.Log("Mod loaded!", LogLevel.Info);
+
+            Config = helper.ReadConfig<ModConfig>();
         }
 
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
@@ -81,13 +84,8 @@ namespace NemosMagicMod
 
             var player = Game1.player;
 
-            if (e.Button == SButton.L) // Trigger on L
-            {
-                TriggerBookAnimation(Game1.player);
-            }
-
             // Spell selection menu key
-            if (e.Button == SButton.D9)
+            if (e.Button == Config.SpellSelectionKey)
             {
                 Game1.activeClickableMenu = new SpellSelectionMenu(Helper, Monitor);
                 return;
@@ -191,6 +189,13 @@ namespace NemosMagicMod
 
             SkillRegistrar.Register(new Magic_Skill(), Monitor);
             Monitor.Log("Registered Magic skill during GameLaunched.", LogLevel.Info);
+
+            var gmcm = Helper.ModRegistry.GetApi<SpaceShared.APIs.IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (gmcm != null)
+            {
+                Config.RegisterGMCM(Helper, gmcm, ModManifest);
+                Monitor.Log("GMCM options registered.", LogLevel.Info);
+            }
         }
 
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
