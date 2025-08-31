@@ -307,9 +307,12 @@ namespace NemosMagicMod
             }
         }
 
+
+        private double manaRegenAccumulator = 0.0;
+
         public void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
-            if (!Context.IsWorldReady)
+            if (!Context.IsWorldReady || Game1.player == null)
                 return;
 
             // --- Update active spells ---
@@ -323,7 +326,25 @@ namespace NemosMagicMod
                     ActiveSpells.RemoveAt(i);
                 }
             }
+
+            // --- Calculate mana regeneration ---
+            double manaPerSecond = 0.1 * MagicLevel; // natural regen
+            int manaRegenId = GetProfessionId(SkillID, "ManaRegeneration");
+            if (Game1.player.professions.Contains(manaRegenId))
+                manaPerSecond += 1.0; // extra 1 mana/sec from profession
+
+            double manaPerTick = manaPerSecond / 60.0; // SMAPI: 60 ticks/sec
+            manaRegenAccumulator += manaPerTick;
+
+            // --- Apply accumulated mana when it reaches 1 or more ---
+            int restoreAmount = (int)Math.Floor(manaRegenAccumulator);
+            if (restoreAmount > 0)
+            {
+                ManaManager.RestoreMana(restoreAmount);
+                manaRegenAccumulator -= restoreAmount;
+            }
         }
+
 
         public static void RegisterActiveSpell(Spell spell)
         {

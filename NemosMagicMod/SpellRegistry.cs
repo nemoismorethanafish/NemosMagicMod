@@ -19,6 +19,8 @@ public static class SpellRegistry //List of all spells
     public static Spell TimeWarp { get; } = new TimeWarp();
     public static Spell HomeWarp { get; } = new HomeWarp();
     public static Spell FertilitySpirit { get; } = new FertilitySpirit();
+    public static Spell FireCyclone { get; } = new FireCyclone();
+
 
 
 
@@ -39,7 +41,8 @@ public static class SpellRegistry //List of all spells
         SeaSpirit,
         TimeWarp,
         HomeWarp,
-        FertilitySpirit
+        FertilitySpirit,
+        FireCyclone
     };
 
 
@@ -52,7 +55,8 @@ public static class SpellRegistry //List of all spells
         public static bool IsSpellUnlocked(Spell spell)
         {
             if (spell.Id == "nemo.WindSpirit" ||
-                spell.Id == "nemo.Heal")
+                spell.Id == "nemo.Heal" ||
+                spell.Id == "nemo.FireCyclone")
             {
                 return true;
             }

@@ -111,9 +111,6 @@ namespace NemosMagicMod.Spells
                 Game1.playSound("wand");
                 Game1.activeClickableMenu = null;
 
-                // Swirl particle effects
-                AddSwirlEffect(who);
-
                 // --- Record cast usage ---
                 if (!normalUsedToday)
                 {
@@ -125,43 +122,6 @@ namespace NemosMagicMod.Spells
                 }
 
             }, 1000);
-        }
-
-        private void AddSwirlEffect(Farmer who)
-        {
-            Vector2 position = who.Position;
-            int particleCount = 12;
-
-            for (int i = 0; i < particleCount; i++)
-            {
-                double angle = i * (Math.PI * 2 / particleCount);
-                Vector2 offset = new Vector2(
-                    (float)Math.Cos(angle) * 64f,
-                    (float)Math.Sin(angle) * 64f
-                );
-
-                TemporaryAnimatedSprite swirl = new TemporaryAnimatedSprite(
-                    textureName: "TileSheets\\animations",
-                    sourceRect: new Rectangle(0, 0, 64, 64),
-                    animationInterval: 100f,
-                    animationLength: 4,
-                    numberOfLoops: 1,
-                    position: position + offset,
-                    flicker: false,
-                    flipped: false
-                )
-                {
-                    motion = -offset / 32f, // move inward
-                    acceleration = Vector2.Zero,
-                    scale = 0.5f,
-                    alphaFade = 0.02f,
-                    color = Color.LightBlue,
-                    layerDepth = 1f,
-                    rotationChange = 0.1f
-                };
-
-                Game1.currentLocation.temporarySprites.Add(swirl);
-            }
         }
     }
 }
