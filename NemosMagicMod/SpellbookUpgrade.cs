@@ -55,50 +55,6 @@ namespace NemosMagicMod.Spells
             }
         }
 
-        // Offer upgrade dialogue
-        // Offer upgrade dialogue
-        public static void OfferWizardUpgrade(Farmer player, Spellbook spellbook, IMonitor monitor)
-        {
-            // Already at highest tier? Don’t show menu
-            if (spellbook.Tier >= SpellbookTier.Master)
-            {
-                Game1.showGlobalMessage("Your Spellbook is already at the highest tier!");
-                return;
-            }
-
-            Response[] responses = new Response[]
-            {
-        new Response("Yes", "Yes"),
-        new Response("No", "No")
-            };
-
-            Game1.currentLocation.createQuestionDialogue(
-                $"The Wizard offers to help upgrade your Spellbook from {spellbook.Tier} tier. Study today?",
-                responses,
-                "UpgradeSpellbook"
-            );
-
-            void OnResponse(Farmer who, string whichAnswer)
-            {
-                Game1.currentLocation.afterQuestion -= OnResponse;
-
-                if (whichAnswer == "Yes")
-                {
-                    Game1.dialogueUp = false;
-                    Game1.activeClickableMenu = null;
-                    Game1.currentSpeaker = null;
-
-                    Game1.delayedActions.Add(new DelayedAction(1, () =>
-                    {
-                        Game1.activeClickableMenu = new SpellbookUpgradeMenu(player, spellbook, monitor);
-                    }));
-                }
-            }
-
-            Game1.currentLocation.afterQuestion += OnResponse;
-        }
-
-
         // --- Upgrade Menu ---
         public class SpellbookUpgradeMenu : IClickableMenu
         {
@@ -292,63 +248,13 @@ namespace NemosMagicMod.Spells
                         ? "Studying this spellbook will advance it to the next tier. It will take 6 hours."
                         : "Cannot study after 6 PM.";
 
-                    int tooltipMaxWidth = 600; // twice as wide
-                    int tooltipPadding = 8;
-                    int lineHeight = 28; // more spacing between lines
-
-                    // Split text into lines
-                    List<string> lines = new List<string>();
-                    string currentLine = "";
-                    foreach (string word in tooltip.Split(' '))
-                    {
-                        string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
-                        if (SpriteText.getWidthOfString(testLine) <= tooltipMaxWidth)
-                            currentLine = testLine;
-                        else
-                        {
-                            lines.Add(currentLine);
-                            currentLine = word;
-                        }
-                    }
-                    if (!string.IsNullOrEmpty(currentLine))
-                        lines.Add(currentLine);
-
-                    // Tooltip dimensions
-                    int boxWidth = tooltipMaxWidth + tooltipPadding * 2;
-                    int boxHeight = (lines.Count + 1) * lineHeight + tooltipPadding * 2;
-
-                    // Position tooltip, adjust if it would go off-screen
-                    int tooltipX = Game1.getOldMouseX() + 16;
-                    int tooltipY = Game1.getOldMouseY() + 16;
-                    if (tooltipY + boxHeight > Game1.uiViewport.Height)
-                        tooltipY = Game1.uiViewport.Height - boxHeight - 16; // move up
-
-                    Rectangle background = new Rectangle(tooltipX, tooltipY, boxWidth, boxHeight);
-                    IClickableMenu.drawTextureBox(
-                        Game1.spriteBatch,
-                        Game1.menuTexture,
-                        new Rectangle(0, 256, 60, 60),
-                        background.X,
-                        background.Y,
-                        background.Width,
-                        background.Height,
-                        Color.White,
-                        1f,
-                        true
+                    // Use the same hover text method as SpellSelectionMenu
+                    IClickableMenu.drawHoverText(
+                        b,
+                        tooltip,
+                        Game1.smallFont
                     );
-
-                    // Draw each line
-                    for (int i = 0; i < lines.Count; i++)
-                    {
-                        SpriteText.drawString(
-                            Game1.spriteBatch,
-                            lines[i],
-                            background.X + tooltipPadding + 8,
-                            background.Y + tooltipPadding + i * lineHeight
-                        );
-                    }
                 }
-
 
 
 

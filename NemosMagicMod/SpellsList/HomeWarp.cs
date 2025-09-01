@@ -13,10 +13,14 @@ namespace NemosMagicMod.Spells
     {
         private const int FadeDuration = 1000; // milliseconds
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
+        private Texture2D homeTexture;
+
 
         public HomeWarp()
-            : base("nemo.HomeWarp", "Home Warp", "Teleports you safely to your farmhouse.", 50, 50)
+            : base("nemo.HomeWarp", "Home Warp", "Teleports you safely to your farmhouse.", 50, 50, false, "assets/HomeWarp.png")
         {
+            homeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/HomeWarp.png");
+            iconTexture = homeTexture;
         }
 
         protected override bool FreezePlayerDuringCast => true;

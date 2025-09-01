@@ -14,6 +14,8 @@ namespace NemosMagicMod.Spells
 {
     public class FertilitySpirit : Spell, Spell.IRenderable
     {
+        private Texture2D fiberTexture;
+
         private const int GrowthRadius = 1; // radius in tiles around player
         private const int ParticleCount = 12;
         private const string LastCastKey = "NemosMagicMod.FertilitySpirit.LastCastDay";
@@ -29,9 +31,11 @@ namespace NemosMagicMod.Spells
 
 
         public FertilitySpirit()
-            : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 100, 50)
-        { }
-
+            : base("nemo.FertilitySpirit", "Fertility Spirit", "Advances crops by one growth stage in a small area.", 100, 50, false, "assets/ancientFruit.png")
+        {
+            fiberTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/fiber.png");
+            iconTexture = fiberTexture;
+        }
         protected override bool FreezePlayerDuringCast => true;
 
         public override void Cast(Farmer who)

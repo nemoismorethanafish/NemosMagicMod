@@ -16,6 +16,9 @@ namespace NemosMagicMod.Spells
         private const string LastCastKey = "NemosMagicMod.TimeWarp.LastCastDay";
         protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
+        private Texture2D timeTexture;
+
+
         private int GetProfessionId(string skillId, string professionId)
         {
             return Skills.GetSkill(skillId)
@@ -41,8 +44,11 @@ namespace NemosMagicMod.Spells
                   description: "Bend time backwards. Can only be cast once per day.",
                   manaCost: 100,
                   experienceGained: 50,
-                  isActive: false)
+                  isActive: false,
+                  "assets/TimeSpiral.png")
         {
+            timeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TimeSpiral.png");
+            iconTexture = timeTexture;
         }
 
         public override void Cast(Farmer who)

@@ -26,6 +26,10 @@ public class SpellSelectionMenu : IClickableMenu
     private ClickableComponent studyButton;
     private bool studyButtonHovered = false;
 
+    private const int iconSize = 32;      // Size of the icon
+    private const int iconPadding = 5;    // Space between icon and spell name
+
+
     public SpellSelectionMenu(IModHelper helper, IMonitor monitor, Spellbook spellbook)
         : base(Game1.uiViewport.Width / 2 - 300, Game1.uiViewport.Height / 2 - 225, 600, 450, true)
     {
@@ -103,6 +107,7 @@ public class SpellSelectionMenu : IClickableMenu
         int mouseY = Game1.getMouseY();
         studyButtonHovered = studyButton.bounds.Contains(mouseX, mouseY);
 
+        // 1️⃣ Draw main menu background
         IClickableMenu.drawTextureBox(
             b, Game1.menuTexture,
             new Rectangle(0, 256, 60, 60),
@@ -110,11 +115,13 @@ public class SpellSelectionMenu : IClickableMenu
             width, height, Color.White, 1f, true
         );
 
+        // 2️⃣ Draw title
         SpriteFont font = Game1.dialogueFont;
         string title = "Select a Spell";
         Vector2 titleSize = font.MeasureString(title);
         b.DrawString(font, title, new Vector2(xPositionOnScreen + width / 2 - titleSize.X / 2, yPositionOnScreen + 15), Color.Black);
 
+        // 3️⃣ Draw spell list
         int columnWidth = width / 2 - 40;
         Spell hoveredSpell = null;
 
@@ -130,13 +137,22 @@ public class SpellSelectionMenu : IClickableMenu
             bool isSelected = i == selectedSpellIndex;
             bool isHotkeyed = spells[i].Id == HotkeyedSpellId;
 
+            // Draw background
             b.Draw(Game1.staminaRect, spellBorder, new Color(150, 100, 50, 180));
             if (isSelected) b.Draw(Game1.staminaRect, spellBorder, new Color(255, 215, 0, 120));
             else if (isHotkeyed) b.Draw(Game1.staminaRect, spellBorder, new Color(100, 255, 100, 120));
             else if (isHovered) b.Draw(Game1.staminaRect, spellBorder, new Color(255, 255, 255, 80));
 
+            // Draw icon
+            if (spells[i] != null)
+            {
+                Vector2 iconPos = new Vector2(pos.X + iconSize / 2, pos.Y + 17); // vertically center in row
+                spells[i].DrawIcon(b, iconPos, iconSize / (float)spells[i].IconWidth); // scale to fit iconSize
+            }
+
+            // Draw spell name next to icon
             Color textColor = isSelected ? Color.DarkGoldenrod : Color.Black;
-            b.DrawString(Game1.smallFont, spells[i].Name, pos, textColor);
+            b.DrawString(Game1.smallFont, spells[i].Name, new Vector2(pos.X + iconSize + iconPadding, pos.Y), textColor);
 
             if (isHovered) hoveredSpell = spells[i];
         }
@@ -150,17 +166,7 @@ public class SpellSelectionMenu : IClickableMenu
                 Color.Gray);
         }
 
-        if (hoveredSpell != null)
-        {
-            string tooltip = $"{hoveredSpell.Description}\nMana Cost: {hoveredSpell.ManaCost}";
-            if (hoveredSpell.Id == HotkeyedSpellId)
-                tooltip += "\n[Right-click to remove hotkey]";
-            else
-                tooltip += "\n[Right-click to assign hotkey]";
-
-            IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
-        }
-
+        // 4️⃣ Draw Study button
         Color buttonColor = studyButtonHovered ? new Color(255, 215, 0, 180) : Color.White;
         IClickableMenu.drawTextureBox(
             b, Game1.menuTexture,
@@ -177,6 +183,19 @@ public class SpellSelectionMenu : IClickableMenu
             Color.Black
         );
 
+        // 5️⃣ Draw tooltip last (always on top)
+        if (hoveredSpell != null)
+        {
+            string tooltip = $"{hoveredSpell.Description}\nMana Cost: {hoveredSpell.ManaCost}";
+            if (hoveredSpell.Id == HotkeyedSpellId)
+                tooltip += "\n[Right-click to remove hotkey]";
+            else
+                tooltip += "\n[Right-click to assign hotkey]";
+
+            IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
+        }
+
+        // 6️⃣ Draw mouse cursor
         base.drawMouse(b);
     }
 

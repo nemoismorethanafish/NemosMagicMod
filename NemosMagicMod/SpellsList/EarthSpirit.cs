@@ -52,12 +52,17 @@ public class EarthSpirit : Spell, IRenderable
     private Farmer owner;
 
     public EarthSpirit()
-        : base("nemo.EarthSpirit", "Earth Spirit",
-              "Summons a magical pickaxe that mines rocks. Duration increases with spellbook tier.",
-              30, 25)
+        : base(
+            "nemo.EarthSpirit",
+            "Earth Spirit",
+            "Summons a magical pickaxe that mines rocks. Duration increases with spellbook tier.",
+            30,
+            25,
+            false,
+            "assets/EarthSpiritPickaxe.png") 
     {
         pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
-        pickaxe = new Pickaxe(); // vanilla tool instance
+        iconTexture = pickaxeTexture;
     }
 
     public void Unsubscribe()

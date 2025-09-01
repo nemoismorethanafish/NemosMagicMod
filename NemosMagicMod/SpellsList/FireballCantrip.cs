@@ -11,6 +11,9 @@ namespace NemosMagicMod.Spells
         protected override bool UseBookAnimation => false;
         protected override bool FreezePlayerDuringCast => false;
 
+        private Texture2D magmaTexture;
+
+
 
         public FireballCantrip()
             : base(
@@ -18,11 +21,13 @@ namespace NemosMagicMod.Spells
                 name: "Fireball Cantrip",
                 description: "Throws a fiery explosive projectile.",
                 manaCost: 0,
-                experienceGained: 0
+                experienceGained: 0,
+                false,
+                "assets/MagmaSprite.png"
             )
         {
-            if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id))
-                SpellRegistry.PlayerData.UnlockedSpellIds.Add(this.Id);
+            magmaTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/MagmaSprite.png");
+            iconTexture = magmaTexture;
         }
 
 

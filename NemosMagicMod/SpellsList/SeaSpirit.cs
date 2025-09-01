@@ -50,10 +50,11 @@ namespace NemosMagicMod.Spells
         protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
 
         public SeaSpirit()
-            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 30, 25)
+            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 30, 25, false, "assets/bubbles.png")
         {
             bubbleTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/bubbles.png");
             ApplyHarmonyPatches();
+            iconTexture = bubbleTexture;
         }
 
         public bool IsActive => bubbleTimer > 0f;

@@ -64,10 +64,11 @@ namespace NemosMagicMod.Spells
         public WaterSpirit()
             : base("water_spirit", "Water Spirit",
                   "Summons a friendly rain cloud that waters nearby crops.",
-                  30, 25)
+                  30, 25, false, "assets/raincloud.png")
         {
             cloudTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/raincloud.png");
             splashTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/WaterSplash.png");
+            iconTexture = cloudTexture;
         }
 
         private float GetTierAdjustedDuration(Farmer who)

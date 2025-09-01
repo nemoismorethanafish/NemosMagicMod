@@ -26,10 +26,15 @@ public abstract class Spell
     public bool IsActive { get; set; }
 
     private Texture2D spellbookTexture;
+    public Texture2D iconTexture;
     private bool subscribedDraw = false;
     private float spellbookTimer = 0f;
 
-    public Spell(string id, string name, string description, int manaCost, int experienceGained = 25, bool isActive = false)
+    public int IconWidth => iconTexture?.Width ?? 32;
+    public int IconHeight => iconTexture?.Height ?? 32;
+
+
+    public Spell(string id, string name, string description, int manaCost, int experienceGained = 25, bool isActive = false, string? iconPath = null)
     {
         Id = id;
         Name = name;
@@ -39,6 +44,9 @@ public abstract class Spell
         IsActive = isActive;
 
         spellbookTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
+
+        string pathToLoad = iconPath ?? "assets/magic-icon-smol.png";
+        iconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol");
     }
 
     public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this, ModEntry.Instance.Config);
@@ -240,4 +248,14 @@ public abstract class Spell
     {
         void Unsubscribe();
     }
+
+    public void DrawIcon(SpriteBatch spriteBatch, Vector2 position, float scale = 1f)
+    {
+        if (iconTexture == null)
+            return;
+
+        Vector2 origin = new Vector2(iconTexture.Width / 2f, iconTexture.Height / 2f);
+        spriteBatch.Draw(iconTexture, position, null, Color.White, 0f, origin, scale, SpriteEffects.None, 1f);
+    }
+
 }

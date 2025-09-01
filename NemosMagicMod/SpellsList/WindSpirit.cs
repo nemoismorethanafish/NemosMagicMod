@@ -11,6 +11,8 @@ namespace NemosMagicMod.Spells
         private const string BuffId = "NemosMagicMod_WindSpirit";
         private const float SpeedIncrease = 1; //This will be divided by four later
         private const int DurationMs = 60_000; // 60 seconds
+        private Texture2D windTexture;
+
 
         public WindSpirit()
             : base(
@@ -18,9 +20,14 @@ namespace NemosMagicMod.Spells
                 "Wind Spirit",
                 "Temporarily increases your movement speed.",
                 50,
-                10
+                10,
+                false,
+                "assets/windSpirit.png"
               )
-        { }
+        {
+            windTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/windSpirit.png");
+            iconTexture = windTexture;
+        }
 
 
         public override void Cast(Farmer who)

@@ -22,6 +22,7 @@ public class FireCyclone : Spell, Spell.IRenderable
     private List<TemporaryAnimatedSprite> sprites = new List<TemporaryAnimatedSprite>();
     private float rotation = 0f;
     private GameLocation currentLocation;
+    private Texture2D magmaTexture;
 
     protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
@@ -31,9 +32,14 @@ public class FireCyclone : Spell, Spell.IRenderable
             name: "Fire Cyclone",
             description: "Create a swirling fire cyclone around you, pushing enemies away.",
             manaCost: 100,
-            experienceGained: 50
+            experienceGained: 50,
+            false,
+            "assets/MagmaSparker.png"
         )
-    { }
+    {
+        magmaTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/MagmaSparker.png");
+        iconTexture = magmaTexture;
+    }
 
     public override void Cast(Farmer who)
     {
