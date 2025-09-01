@@ -80,19 +80,6 @@ internal class ManaBar
     {
         helper.Events.Display.RenderingHud += OnRenderingHud;
         helper.Events.GameLoop.DayStarted += (_, _) => ManaManager.Refill();
-        helper.Events.Input.ButtonPressed += OnButtonPressed;
 
-    }
-
-    public void OnButtonPressed(object? sender, StardewModdingAPI.Events.ButtonPressedEventArgs e)
-    {
-        if (!Context.IsWorldReady)
-            return;
-
-        if (e.Button == SButton.D8)
-        {
-            ManaManager.Refill();
-            Game1.addHUDMessage(new HUDMessage("Mana Refilled!", HUDMessage.newQuest_type));
-        }
     }
 }
