@@ -20,6 +20,11 @@ public static class Level5Professions
             ManaManager.RecalculateMaxMana();
             ManaManager.Refill();
         }
+        public override void UndoImmediateProfessionPerk()
+        {
+            ManaManager.RecalculateMaxMana();
+            ManaManager.Refill();
+        }
     }
 
     public class BattleMage : Skill.Profession
@@ -40,6 +45,18 @@ public static class Level5Professions
             if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.FireballCantrip.Id))
             {
                 SpellRegistry.PlayerData.UnlockedSpellIds.Add(SpellRegistry.FireballCantrip.Id);
+            }
+        }
+        public override void UndoImmediateProfessionPerk()
+        {
+            if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.Fireball.Id))
+            {
+                SpellRegistry.PlayerData.UnlockedSpellIds.Add(SpellRegistry.Fireball.Id);
+            }
+
+            if (SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.FireballCantrip.Id))
+            {
+                SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.FireballCantrip.Id);
             }
         }
     }
@@ -74,6 +91,14 @@ public static class Level10Professions
             {
                 SpellRegistry.PlayerData.UnlockedSpellIds.Add(SpellRegistry.FireCyclone.Id);
                 ModEntry.Instance.Monitor.Log("Unlocked Fire Cyclone spell via War Wizard profession!", LogLevel.Info);
+            }
+        }
+        public override void UndoImmediateProfessionPerk()
+        {
+            if (SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.FireCyclone.Id))
+            {
+                SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.FireCyclone.Id);
+                ModEntry.Instance.Monitor.Log("Locked Fire Cyclone spell - enjoy being a Mana Dork!", LogLevel.Info);
             }
         }
     }

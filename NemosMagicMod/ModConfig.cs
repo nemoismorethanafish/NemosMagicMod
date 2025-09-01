@@ -4,10 +4,12 @@ using StardewValley;
 public class ModConfig
 {
     public SButton SpellSelectionKey { get; set; } = SButton.Q;
-    public SButton HotkeyCast { get; set; } = SButton.Z;      
+    public SButton HotkeyCast { get; set; } = SButton.Z;
     public int ManaBarX { get; set; } = 1120;
     public int ManaBarY { get; set; } = 500;
     public bool godMode { get; set; } = false;
+    public bool OverrideMagicLevel { get; set; } = false;
+    public int MagicLevel { get; set; } = 0; 
 
     public void RegisterGMCM(IModHelper helper, SpaceShared.APIs.IGenericModConfigMenuApi gmcm, IManifest manifest)
     {
@@ -16,10 +18,11 @@ public class ModConfig
             reset: () =>
             {
                 SpellSelectionKey = SButton.D9;
-                HotkeyCast = SButton.Z;  // default hotkey
+                HotkeyCast = SButton.Z;
                 ManaBarX = 1120;
                 ManaBarY = 500;
                 godMode = false;
+                MagicLevel = 1;
             },
             save: () => helper.WriteConfig(this)
         );
@@ -71,6 +74,25 @@ public class ModConfig
             tooltip: () => "Infinite Mana, no level reqs, etc.",
             getValue: () => godMode,
             setValue: val => godMode = val
+        );
+
+        gmcm.AddBoolOption(
+            mod: manifest,
+            name: () => "Override Magic Level",
+            tooltip: () => "Set this to true to override the player's Magic Level with the configured value.",
+            getValue: () => OverrideMagicLevel,
+            setValue: val => OverrideMagicLevel = val
+        );
+
+        // Magic level
+        gmcm.AddNumberOption(
+            mod: manifest,
+            name: () => "Magic Level",
+            tooltip: () => "Set your starting magic level.",
+            getValue: () => MagicLevel,
+            setValue: val => MagicLevel = val,
+            min: 0,
+            max: 10
         );
     }
 }

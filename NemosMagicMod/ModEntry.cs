@@ -23,35 +23,29 @@ namespace NemosMagicMod
     {
         void RegisterSerializerType(Type type);
     }
-
     public class ModEntry : Mod
     {
         private ISpaceCoreApi? spaceCoreApi;
-
         public const string SkillID = "nemosmagicmod.Magic";
         public static ModEntry Instance { get; private set; } = null!;
         public static Texture2D MagicSkillIcon { get; private set; } = null!;
         public static int MagicLevel = 0;
-
         private ManaBar manaBar = null!;
         public static PlayerSaveData SaveData = new();
-
-        // === Active Spell Tracking ===
         public static readonly List<Spell> ActiveSpells = new();
-
         private bool queuedWizardUpgrade = false;
         private Spellbook? queuedSpellbook = null;
+        private bool skillSystemReady = false;
+        private int initializationRetries = 0;
+        private const int MAX_RETRIES = 100;
         public ModConfig Config { get; private set; } = null!;
 
         public override void Entry(IModHelper helper)
         {
             Instance = this;
-
-            // LevelUpChanges, mana bar, etc.
             new LevelUpChanges(helper, Monitor);
             ManaManager.SetMaxMana(ManaManager.MaxMana);
             ManaManager.Refill();
-
             manaBar = new ManaBar(
                 () => ManaManager.CurrentMana,
                 () => ManaManager.MaxMana,
@@ -59,7 +53,6 @@ namespace NemosMagicMod
                 10
             );
             manaBar.SubscribeToEvents(helper);
-
             Spellbook.LoadIcon(helper);
             MagicSkillIcon = Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
 
@@ -77,7 +70,6 @@ namespace NemosMagicMod
 
             Config = helper.ReadConfig<ModConfig>();
         }
-
         private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
             if (!Context.IsPlayerFree)
@@ -132,7 +124,6 @@ namespace NemosMagicMod
                 }
             }
         }
-
         private void TriggerBookAnimation(Farmer player)
         {
             if (player == null)
@@ -167,11 +158,51 @@ namespace NemosMagicMod
                 Monitor.Log("Failed to find Object.readBook via reflection.", LogLevel.Warn);
             }
         }
-
         private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
         {
-        }
+            // Only process when closing a menu (menu -> null)
+            if (e.OldMenu == null || e.NewMenu != null)
+                return;
 
+            if (Game1.player == null || !Config.OverrideMagicLevel)
+                return;
+
+            // Only try override if SpaceCore is working
+            if (!skillSystemReady)
+            {
+                Monitor.Log("SpaceCore not ready, skipping skill override", LogLevel.Debug);
+                return;
+            }
+
+            try
+            {
+                SetCustomSkillLevel(Game1.player, SkillID, Config.MagicLevel);
+                MagicLevel = Config.MagicLevel; // sync static variable
+
+                // Adjust mana instantly
+                int totalMana = 100 + 5 * MagicLevel;
+                try
+                {
+                    int manaDorkID = GetProfessionId(SkillID, "ManaDork");
+                    if (Game1.player.professions.Contains(manaDorkID))
+                        totalMana += 50;
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting ManaDork profession during override: {ex.Message}", LogLevel.Warn);
+                }
+
+                ManaManager.SetMaxMana(totalMana);
+                ManaManager.Refill();
+
+                Monitor.Log($"Magic Level overridden to {Config.MagicLevel}", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Error overriding magic level: {ex.Message}", LogLevel.Error);
+                skillSystemReady = false; // Reset flag if SpaceCore is having issues
+            }
+        }
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
         {
             spaceCoreApi = Helper.ModRegistry.GetApi<ISpaceCoreApi>("spacechase0.SpaceCore");
@@ -194,7 +225,6 @@ namespace NemosMagicMod
                 Monitor.Log("GMCM options registered.", LogLevel.Info);
             }
         }
-
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
             SaveData = Helper.Data.ReadSaveData<PlayerSaveData>("player-save-data") ?? new PlayerSaveData();
@@ -203,7 +233,60 @@ namespace NemosMagicMod
             // Clean up any conflicting spells after loading
             Helper.Events.GameLoop.UpdateTicked += CleanupConflictingSpells;
         }
+        private void SetCustomSkillLevel(Farmer player, string skillId, int targetLevel)
+        {
+            var skill = Skills.GetSkill(skillId);
+            if (skill == null)
+            {
+                Monitor.Log($"Cannot set unknown skill {skillId} - skill not registered", LogLevel.Warn);
+                return;
+            }
 
+            try
+            {
+                // Get current level safely
+                int currentLevel = 0;
+                try
+                {
+                    currentLevel = Skills.GetSkillLevel(player, skillId);
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting current skill level for {skillId}: {ex.Message}", LogLevel.Warn);
+                    // Continue with currentLevel = 0
+                }
+
+                // Clamp level within the skill's ExperienceCurve
+                targetLevel = Math.Clamp(targetLevel, 0, skill.ExperienceCurve.Length);
+
+                // Get target XP for the level
+                int targetXP = targetLevel == 0 ? 0 : skill.ExperienceCurve[targetLevel - 1];
+
+                int currentXP = 0;
+                try
+                {
+                    currentXP = Skills.GetExperienceFor(player, skillId);
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting current XP for {skillId}: {ex.Message}", LogLevel.Warn);
+                    // Continue with currentXP = 0
+                }
+
+                int deltaXP = targetXP - currentXP;
+
+                if (deltaXP != 0)
+                {
+                    Skills.AddExperience(player, skillId, deltaXP);
+                }
+
+                Monitor.Log($"Set {skillId} level from {currentLevel} to {targetLevel} (XP={targetXP})", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Error setting skill level for {skillId}: {ex.Message}", LogLevel.Error);
+            }
+        }
         private void CleanupConflictingSpells(object? sender, UpdateTickedEventArgs e)
         {
             Helper.Events.GameLoop.UpdateTicked -= CleanupConflictingSpells;
@@ -241,10 +324,13 @@ namespace NemosMagicMod
         }
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
-            // Run these once after the first UpdateTicked after day start
-            Helper.Events.GameLoop.UpdateTicked += RunDayStartSetup;
-        }
+            // Reset initialization state
+            skillSystemReady = false;
+            initializationRetries = 0;
 
+            // Start checking for SpaceCore readiness
+            Helper.Events.GameLoop.UpdateTicked += CheckSpaceCoreReady;
+        }
         private void RunDayStartSetup(object? sender, UpdateTickedEventArgs e)
         {
             Helper.Events.GameLoop.UpdateTicked -= RunDayStartSetup;
@@ -252,27 +338,72 @@ namespace NemosMagicMod
             if (Game1.player == null)
                 return;
 
-            // Update Magic level
-            MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
-            Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
-
-            // Set max mana based on skill level
-            int baseMana = 100;
-            int totalMana = baseMana + 5 * MagicLevel;
-
-            // Get the profession ID for Mana Dork
-            int manaDorkID = GetProfessionId(SkillID, "ManaDork");
-
-            // Apply bonus if player has Mana Dork
-            if (Game1.player.professions.Contains(manaDorkID))
+            var skill = Skills.GetSkill(SkillID);
+            if (skill == null)
             {
-                totalMana += 50;
+                Monitor.Log("Magic skill not yet registered, deferring setup.", LogLevel.Debug);
+                // Defer setup by re-subscribing to try again next tick
+                Helper.Events.GameLoop.UpdateTicked += RunDayStartSetup;
+                return;
             }
 
-            ManaManager.SetMaxMana(totalMana);
-            ManaManager.Refill();
+            try
+            {
+                // Update Magic level safely
+                MagicLevel = 0; // Default value
+                try
+                {
+                    MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting Magic level during setup: {ex.Message}", LogLevel.Warn);
+                }
 
-            Monitor.Log($"Max Mana after day start setup: {ManaManager.MaxMana}", LogLevel.Debug);
+                Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
+
+                // Set max mana based on skill level
+                int baseMana = 100;
+                int totalMana = baseMana + 5 * MagicLevel;
+
+                // Get the profession ID for Mana Dork safely
+                try
+                {
+                    int manaDorkID = GetProfessionId(SkillID, "ManaDork");
+                    if (Game1.player.professions.Contains(manaDorkID))
+                    {
+                        totalMana += 50;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting ManaDork profession: {ex.Message}", LogLevel.Warn);
+                }
+
+                ManaManager.SetMaxMana(totalMana);
+                ManaManager.Refill();
+
+                Monitor.Log($"Max Mana after day start setup: {ManaManager.MaxMana}", LogLevel.Debug);
+
+                // Give spellbook if the player doesn't have one
+                if (!PlayerHasSpellbookAnywhere(Game1.player))
+                {
+                    Game1.player.addItemToInventory(new Spellbook());
+                    Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Error in RunDayStartSetup: {ex.Message}", LogLevel.Error);
+            }
+        }
+        private void RunBasicDayStartSetup()
+        {
+            if (Game1.player == null) return;
+
+            // Set basic mana without skill bonuses
+            ManaManager.SetMaxMana(100);
+            ManaManager.Refill();
 
             // Give spellbook if the player doesn't have one
             if (!PlayerHasSpellbookAnywhere(Game1.player))
@@ -280,8 +411,56 @@ namespace NemosMagicMod
                 Game1.player.addItemToInventory(new Spellbook());
                 Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
             }
-        }
 
+            Monitor.Log("Basic day start setup completed (SpaceCore unavailable)", LogLevel.Info);
+        }
+        private void RunFullDayStartSetup()
+        {
+            if (Game1.player == null) return;
+
+            try
+            {
+                // Update Magic level
+                MagicLevel = Skills.GetSkillLevel(Game1.player, SkillID);
+                Monitor.Log($"Magic Level updated: {MagicLevel}", LogLevel.Debug);
+
+                // Set max mana based on skill level
+                int baseMana = 100;
+                int totalMana = baseMana + 5 * MagicLevel;
+
+                // Get the profession ID for Mana Dork
+                try
+                {
+                    int manaDorkID = GetProfessionId(SkillID, "ManaDork");
+                    if (Game1.player.professions.Contains(manaDorkID))
+                    {
+                        totalMana += 50;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting ManaDork profession: {ex.Message}", LogLevel.Warn);
+                }
+
+                ManaManager.SetMaxMana(totalMana);
+                ManaManager.Refill();
+
+                Monitor.Log($"Max Mana after day start setup: {ManaManager.MaxMana}", LogLevel.Debug);
+
+                // Give spellbook if the player doesn't have one
+                if (!PlayerHasSpellbookAnywhere(Game1.player))
+                {
+                    Game1.player.addItemToInventory(new Spellbook());
+                    Monitor.Log("Added Spellbook to player's inventory.", LogLevel.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                Monitor.Log($"Error in RunFullDayStartSetup: {ex.Message}", LogLevel.Error);
+                // Fallback to basic setup
+                RunBasicDayStartSetup();
+            }
+        }
         private static void OnDayEnding(object sender, DayEndingEventArgs e)
         {
             if (Game1.player == null) return;
@@ -302,7 +481,6 @@ namespace NemosMagicMod
                          .Single(p => p.Id == profession)
                          .GetVanillaId();
         }
-
         private bool PlayerHasSpellbookAnywhere(Farmer player)
         {
             if (player.Items.Any(item => item is Spellbook)) return true;
@@ -330,7 +508,6 @@ namespace NemosMagicMod
 
             return false;
         }
-
         private bool LocationHasSpellbook(GameLocation location)
         {
             foreach (var obj in location.Objects.Values)
@@ -340,12 +517,10 @@ namespace NemosMagicMod
             }
             return false;
         }
-
         private void OnSaving(object? sender, SavingEventArgs e)
         {
             Helper.Data.WriteSaveData("player-save-data", SaveData);
         }
-
         private void UpdateMagicLevel()
         {
             if (Game1.player == null) return;
@@ -360,7 +535,44 @@ namespace NemosMagicMod
                 Monitor.Log($"Error updating MagicLevel: {ex}", LogLevel.Error);
             }
         }
+        private void CheckSpaceCoreReady(object? sender, UpdateTickedEventArgs e)
+        {
+            initializationRetries++;
 
+            // Give up after too many retries
+            if (initializationRetries > MAX_RETRIES)
+            {
+                Helper.Events.GameLoop.UpdateTicked -= CheckSpaceCoreReady;
+                Monitor.Log("SpaceCore initialization timeout - running setup without skill system", LogLevel.Warn);
+                RunBasicDayStartSetup();
+                return;
+            }
+
+            // Check if SpaceCore skills are working
+            try
+            {
+                var skill = Skills.GetSkill(SkillID);
+                if (skill != null && Game1.player != null)
+                {
+                    // Try to get skill level - this will throw if SpaceCore isn't ready
+                    int testLevel = Skills.GetSkillLevel(Game1.player, SkillID);
+
+                    // If we got here, SpaceCore is working
+                    Helper.Events.GameLoop.UpdateTicked -= CheckSpaceCoreReady;
+                    skillSystemReady = true;
+                    Monitor.Log($"SpaceCore ready after {initializationRetries} ticks", LogLevel.Debug);
+                    RunFullDayStartSetup();
+                }
+            }
+            catch (Exception ex)
+            {
+                // SpaceCore not ready yet, continue checking
+                if (initializationRetries % 30 == 0) // Log every half second
+                {
+                    Monitor.Log($"Waiting for SpaceCore... (attempt {initializationRetries})", LogLevel.Debug);
+                }
+            }
+        }
 
         private double manaRegenAccumulator = 0.0;
 
@@ -383,9 +595,23 @@ namespace NemosMagicMod
 
             // --- Calculate mana regeneration ---
             double manaPerSecond = 0.1 * MagicLevel + 0.1; // natural regen
-            int manaRegenId = GetProfessionId(SkillID, "ManaRegeneration");
-            if (Game1.player.professions.Contains(manaRegenId))
-                manaPerSecond += 1.0; // extra 1 mana/sec from profession
+
+            // Only try to get profession bonuses if SpaceCore is working
+            if (skillSystemReady)
+            {
+                try
+                {
+                    int manaRegenId = GetProfessionId(SkillID, "ManaRegeneration");
+                    if (Game1.player.professions.Contains(manaRegenId))
+                        manaPerSecond += 1.0; // extra 1 mana/sec from profession
+                }
+                catch (Exception ex)
+                {
+                    Monitor.Log($"Error getting mana regen profession: {ex.Message}", LogLevel.Warn);
+                    skillSystemReady = false; // Reset flag if SpaceCore is having issues
+                }
+            }
+
             if (Config.godMode == true)
                 manaPerSecond += 50.0;
 
@@ -400,7 +626,6 @@ namespace NemosMagicMod
                 manaRegenAccumulator -= restoreAmount;
             }
         }
-
 
         public static void RegisterActiveSpell(Spell spell)
         {

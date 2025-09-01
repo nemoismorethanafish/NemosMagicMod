@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using NemosMagicMod.Spells;
+using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Buffs;
 using StardewValley.Monsters;
@@ -25,6 +26,8 @@ public class FireCyclone : Spell, Spell.IRenderable
     private GameLocation currentLocation;
     private Texture2D magmaTexture;
     private Texture2D buffIconTexture;
+
+    private List<Vector2> spriteOffsets = new List<Vector2>();
 
     protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
@@ -50,19 +53,19 @@ public class FireCyclone : Spell, Spell.IRenderable
         if (!CanCast(who))
             return;
 
-        base.Cast(who);
-
         if (IsActive)
         {
             Game1.showRedMessage("Fire Cyclone is already active!");
             return;
         }
 
+        base.Cast(who);
+
         owner = who;
         currentLocation = who.currentLocation;
         timer = DurationMs / 1000f;
         IsActive = true;
-        rotation = 0f;
+        rotation = 0f; // reset rotation velocity
 
         // Clear any existing sprites
         sprites.Clear();
@@ -70,11 +73,43 @@ public class FireCyclone : Spell, Spell.IRenderable
         // Apply Buff
         ApplyFireCycloneBuff(owner);
 
-        // Create the cyclone sprites
-        CreateCycloneSprites();
-
         Game1.playSound("fireball");
+
+        // Prevent multiple subscriptions
+        ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
+        ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
     }
+
+    private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
+    {
+        if (!IsActive || owner == null)
+            return;
+
+        SpriteBatch spriteBatch = e.SpriteBatch;
+
+        int spriteCount = 16;
+        float baseScale = 0.5f; // smaller size
+
+        for (int i = 0; i < spriteCount; i++)
+        {
+            float angle = rotation + MathHelper.TwoPi * i / spriteCount;
+            Vector2 offset = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 192f;
+            Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, owner.Position + offset + new Vector2(0f, -24f));
+
+            spriteBatch.Draw(
+                magmaTexture,
+                screenPos,
+                null,
+                Color.White,
+                rotation,
+                new Vector2(magmaTexture.Width / 2f, magmaTexture.Height / 2f),
+                baseScale,
+                SpriteEffects.None,
+                1f
+            );
+        }
+    }
+
 
     private void ApplyFireCycloneBuff(Farmer who)
     {
@@ -100,42 +135,6 @@ public class FireCyclone : Spell, Spell.IRenderable
         if (who?.buffs?.IsApplied(BuffId) == true)
         {
             who.buffs.Remove(BuffId);
-        }
-    }
-
-    private void CreateCycloneSprites()
-    {
-        if (owner?.currentLocation == null) return;
-
-        int spriteCount = 16;
-
-        for (int i = 0; i < spriteCount; i++)
-        {
-            Color flameColor = new Color(
-                255,
-                random.Next(140, 255),
-                random.Next(0, 100)
-            );
-
-            var sprite = new TemporaryAnimatedSprite(
-                "LooseSprites\\Cursors",        // built-in texture
-                new Rectangle(211, 428, 7, 6),  // heart sprite rectangle
-                120f,                            // animation interval
-                1,                               // animation length
-                9999,                            // number of loops
-                owner.Position,                  // starting position
-                false,                           // flipped
-                false                            // flicker
-            );
-
-            sprite.scale = 3f;
-            sprite.color = flameColor;
-            sprite.layerDepth = 1f;
-            sprite.rotationChange = 0.03f;
-            sprite.alphaFade = 0f;
-
-            currentLocation.temporarySprites.Add(sprite);
-            sprites.Add(sprite);
         }
     }
     public override void Update(GameTime gameTime, Farmer who)
@@ -232,6 +231,32 @@ public class FireCyclone : Spell, Spell.IRenderable
         RemoveFireCycloneBuff(owner);
 
         Game1.addHUDMessage(new HUDMessage("Fire Cyclone dissipated.", 1));
+
+        ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
+    }
+
+    public void Draw(SpriteBatch spriteBatch)
+    {
+        if (!IsActive || owner == null) return;
+
+        for (int i = 0; i < spriteOffsets.Count; i++)
+        {
+            float angle = rotation + MathHelper.TwoPi * i / spriteOffsets.Count;
+            Vector2 offset = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 192f;
+            Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, owner.Position + offset + new Vector2(0, -24f));
+
+            spriteBatch.Draw(
+                magmaTexture,
+                screenPos,
+                null,
+                Color.White,
+                rotation,
+                new Vector2(magmaTexture.Width / 2f, magmaTexture.Height / 2f),
+                2f,
+                SpriteEffects.None,
+                1f
+            );
+        }
     }
 
     public void Unsubscribe()
