@@ -98,6 +98,38 @@ namespace NemosMagicMod
                 }
                 return;
             }
+            // Hotkey spell cast
+            if (e.Button == Config.HotkeyCast)
+            {
+                Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
+                if (spellbook == null)
+                {
+                    Game1.showRedMessage("You don't have a Spellbook!");
+                    return;
+                }
+
+                string? hotkeyId = SaveData.HotkeyedSpellId;
+                if (string.IsNullOrEmpty(hotkeyId))
+                {
+                    Game1.showRedMessage("No hotkeyed spell assigned.");
+                    return;
+                }
+
+                var spell = SpellRegistry.Spells.FirstOrDefault(s => s.Id == hotkeyId);
+                if (spell != null)
+                {
+                    if (player.Items.Contains(spellbook))
+                    {
+                        spell.Cast(player);
+                        Game1.playSound("coin");
+                        Game1.addHUDMessage(new HUDMessage($"Cast {spell.Name} via Hotkey!", HUDMessage.newQuest_type));
+                    }
+                    else
+                    {
+                        Game1.showRedMessage("You need the Spellbook in your inventory to cast this spell.");
+                    }
+                }
+            }
         }
 
         private void TriggerBookAnimation(Farmer player)

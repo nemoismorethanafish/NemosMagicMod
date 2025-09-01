@@ -18,12 +18,11 @@ public class SpellSelectionMenu : IClickableMenu
 
     private List<Spell> spells = new();
     private int selectedSpellIndex = 0;
-    private bool needsRefresh = true; // Flag to track when we need to refresh
+    private bool needsRefresh = true;
 
     private const int maxPerColumn = 8;
     private const int spellSpacing = 40;
 
-    // Study button
     private ClickableComponent studyButton;
     private bool studyButtonHovered = false;
 
@@ -34,7 +33,6 @@ public class SpellSelectionMenu : IClickableMenu
         this.monitor = monitor;
         this.playerSpellbook = spellbook;
 
-        // Always refresh when menu is created
         RefreshSpellList();
 
         int buttonWidth = 180;
@@ -62,7 +60,6 @@ public class SpellSelectionMenu : IClickableMenu
                 spells.Add(spell);
         }
 
-        // Try to maintain the same selected spell after refresh
         if (previousSelectedSpell != null)
         {
             int index = spells.FindIndex(s => s.Id == previousSelectedSpell.Id);
@@ -78,38 +75,34 @@ public class SpellSelectionMenu : IClickableMenu
             selectedSpellIndex = 0;
         }
 
-        // Ensure selectedSpellIndex is within bounds
         if (selectedSpellIndex >= spells.Count)
             selectedSpellIndex = Math.Max(0, spells.Count - 1);
 
         needsRefresh = false;
 
-        // Log if spell list changed (for debugging)
         if (previousSpellCount != spells.Count)
         {
             monitor.Log($"Spell list refreshed: {spells.Count} spells available", LogLevel.Debug);
         }
     }
 
-    // Public method to trigger refresh from outside
-    public void ForceRefresh()
+    public void ForceRefresh() => needsRefresh = true;
+
+    // Persistent hotkey stored in PlayerSaveData
+    public string? HotkeyedSpellId
     {
-        needsRefresh = true;
+        get => ModEntry.SaveData.HotkeyedSpellId;
+        set => ModEntry.SaveData.HotkeyedSpellId = value;
     }
 
     public override void draw(SpriteBatch b)
     {
-        // Only refresh if needed, not every frame
-        if (needsRefresh)
-        {
-            RefreshSpellList();
-        }
+        if (needsRefresh) RefreshSpellList();
 
         int mouseX = Game1.getMouseX();
         int mouseY = Game1.getMouseY();
         studyButtonHovered = studyButton.bounds.Contains(mouseX, mouseY);
 
-        // Menu background
         IClickableMenu.drawTextureBox(
             b, Game1.menuTexture,
             new Rectangle(0, 256, 60, 60),
@@ -117,7 +110,6 @@ public class SpellSelectionMenu : IClickableMenu
             width, height, Color.White, 1f, true
         );
 
-        // Title
         SpriteFont font = Game1.dialogueFont;
         string title = "Select a Spell";
         Vector2 titleSize = font.MeasureString(title);
@@ -126,7 +118,6 @@ public class SpellSelectionMenu : IClickableMenu
         int columnWidth = width / 2 - 40;
         Spell hoveredSpell = null;
 
-        // Draw spells
         for (int i = 0; i < spells.Count; i++)
         {
             int column = i / maxPerColumn;
@@ -137,9 +128,11 @@ public class SpellSelectionMenu : IClickableMenu
 
             bool isHovered = spellBorder.Contains(mouseX, mouseY);
             bool isSelected = i == selectedSpellIndex;
+            bool isHotkeyed = spells[i].Id == HotkeyedSpellId;
 
             b.Draw(Game1.staminaRect, spellBorder, new Color(150, 100, 50, 180));
             if (isSelected) b.Draw(Game1.staminaRect, spellBorder, new Color(255, 215, 0, 120));
+            else if (isHotkeyed) b.Draw(Game1.staminaRect, spellBorder, new Color(100, 255, 100, 120));
             else if (isHovered) b.Draw(Game1.staminaRect, spellBorder, new Color(255, 255, 255, 80));
 
             Color textColor = isSelected ? Color.DarkGoldenrod : Color.Black;
@@ -148,7 +141,6 @@ public class SpellSelectionMenu : IClickableMenu
             if (isHovered) hoveredSpell = spells[i];
         }
 
-        // Show message if no spells available
         if (spells.Count == 0)
         {
             string noSpellsText = "No spells available";
@@ -158,14 +150,17 @@ public class SpellSelectionMenu : IClickableMenu
                 Color.Gray);
         }
 
-        // Tooltip
         if (hoveredSpell != null)
         {
             string tooltip = $"{hoveredSpell.Description}\nMana Cost: {hoveredSpell.ManaCost}";
+            if (hoveredSpell.Id == HotkeyedSpellId)
+                tooltip += "\n[Right-click to remove hotkey]";
+            else
+                tooltip += "\n[Right-click to assign hotkey]";
+
             IClickableMenu.drawHoverText(b, tooltip, Game1.smallFont);
         }
 
-        // Draw Study button
         Color buttonColor = studyButtonHovered ? new Color(255, 215, 0, 180) : Color.White;
         IClickableMenu.drawTextureBox(
             b, Game1.menuTexture,
@@ -196,9 +191,46 @@ public class SpellSelectionMenu : IClickableMenu
             return;
         }
 
-        // Don't allow selection if no spells available
+        if (spells.Count == 0) return;
+        SelectSpellAtPoint(x, y);
+    }
+
+    public override void receiveRightClick(int x, int y, bool playSound = true)
+    {
         if (spells.Count == 0) return;
 
+        for (int i = 0; i < spells.Count; i++)
+        {
+            int column = i / maxPerColumn;
+            int row = i % maxPerColumn;
+
+            Rectangle spellBorder = new Rectangle(
+                xPositionOnScreen + 30 + column * (width / 2) - 10,
+                yPositionOnScreen + 90 + row * spellSpacing - 5,
+                width / 2 - 40, 35
+            );
+
+            if (spellBorder.Contains(x, y))
+            {
+                string spellId = spells[i].Id;
+                if (HotkeyedSpellId == spellId)
+                {
+                    HotkeyedSpellId = null;
+                    Game1.addHUDMessage(new HUDMessage($"Removed hotkey from {spells[i].Name}", HUDMessage.newQuest_type));
+                }
+                else
+                {
+                    HotkeyedSpellId = spellId;
+                    Game1.addHUDMessage(new HUDMessage($"Assigned hotkey to {spells[i].Name}", HUDMessage.newQuest_type));
+                }
+                Game1.playSound("smallSelect");
+                break;
+            }
+        }
+    }
+
+    private void SelectSpellAtPoint(int x, int y)
+    {
         int columnWidth = width / 2 - 40;
         for (int i = 0; i < spells.Count; i++)
         {
@@ -220,57 +252,6 @@ public class SpellSelectionMenu : IClickableMenu
                 Game1.exitActiveMenu();
                 break;
             }
-        }
-    }
-
-    public override void receiveKeyPress(Keys key)
-    {
-        // Don't allow navigation if no spells available
-        if (spells.Count == 0)
-        {
-            if (key == Keys.Escape)
-                Game1.exitActiveMenu();
-            return;
-        }
-
-        if (key == Keys.Up)
-        {
-            if (selectedSpellIndex % maxPerColumn > 0) selectedSpellIndex--;
-            Game1.playSound("shiny4");
-        }
-        else if (key == Keys.Down)
-        {
-            if (selectedSpellIndex % maxPerColumn < maxPerColumn - 1 && selectedSpellIndex + 1 < spells.Count)
-                selectedSpellIndex++;
-            Game1.playSound("shiny4");
-        }
-        else if (key == Keys.Left)
-        {
-            if (selectedSpellIndex >= maxPerColumn) selectedSpellIndex -= maxPerColumn;
-            Game1.playSound("shiny4");
-        }
-        else if (key == Keys.Right)
-        {
-            if (selectedSpellIndex + maxPerColumn < spells.Count) selectedSpellIndex += maxPerColumn;
-            Game1.playSound("shiny4");
-        }
-        else if (key == Keys.Enter)
-        {
-            if (selectedSpellIndex < spells.Count)
-            {
-                spells[selectedSpellIndex].Cast(Game1.player);
-                Game1.exitActiveMenu();
-                Game1.playSound("coin");
-            }
-        }
-        else if (key == Keys.Escape)
-        {
-            Game1.exitActiveMenu();
-        }
-        else if (key == Keys.F5) // Add F5 to manually refresh (useful for debugging)
-        {
-            needsRefresh = true;
-            Game1.playSound("shiny4");
         }
     }
 }

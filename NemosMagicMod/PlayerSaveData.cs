@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 
-namespace NemosMagicMod
+public class PlayerSaveData
 {
-    public class PlayerSaveData
-    {
-        public HashSet<string> UnlockedSpellIds { get; set; } = new();
-    }
+    public HashSet<string> UnlockedSpellIds { get; set; } = new();
+
+    // Persistent hotkey
+    public string? HotkeyedSpellId { get; set; } = null;
 }

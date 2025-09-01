@@ -3,7 +3,8 @@ using StardewValley;
 
 public class ModConfig
 {
-    public SButton SpellSelectionKey { get; set; } = SButton.D9;
+    public SButton SpellSelectionKey { get; set; } = SButton.Q;
+    public SButton HotkeyCast { get; set; } = SButton.Z;      
     public int ManaBarX { get; set; } = 1120;
     public int ManaBarY { get; set; } = 500;
     public bool godMode { get; set; } = false;
@@ -15,6 +16,7 @@ public class ModConfig
             reset: () =>
             {
                 SpellSelectionKey = SButton.D9;
+                HotkeyCast = SButton.Z;  // default hotkey
                 ManaBarX = 1120;
                 ManaBarY = 500;
                 godMode = false;
@@ -22,6 +24,7 @@ public class ModConfig
             save: () => helper.WriteConfig(this)
         );
 
+        // Spell selection menu key
         gmcm.AddKeybind(
             mod: manifest,
             name: () => "Spell Selection Key",
@@ -30,6 +33,16 @@ public class ModConfig
             setValue: val => SpellSelectionKey = val
         );
 
+        // Hotkey cast
+        gmcm.AddKeybind(
+            mod: manifest,
+            name: () => "Hotkey Cast",
+            tooltip: () => "The key to instantly cast your hotkeyed spell.",
+            getValue: () => HotkeyCast,
+            setValue: val => HotkeyCast = val
+        );
+
+        // Mana bar X
         gmcm.AddNumberOption(
             mod: manifest,
             name: () => "Mana Bar X",
@@ -40,6 +53,7 @@ public class ModConfig
             max: Game1.uiViewport.Width
         );
 
+        // Mana bar Y
         gmcm.AddNumberOption(
             mod: manifest,
             name: () => "Mana Bar Y",
@@ -50,6 +64,7 @@ public class ModConfig
             max: Game1.uiViewport.Height
         );
 
+        // God mode
         gmcm.AddBoolOption(
             mod: manifest,
             name: () => "God Mode",
