@@ -1,5 +1,4 @@
-﻿// Updated ModConfig.cs
-using NemosMagicMod;
+﻿using NemosMagicMod;
 using StardewModdingAPI;
 using StardewValley;
 
@@ -10,7 +9,10 @@ public class ModConfig
     public int ManaBarX { get; set; } = 1120;
     public int ManaBarY { get; set; } = 500;
     public bool godMode { get; set; } = false;
-    public int MagicLevel { get; set; } = 0; // Remove the OverrideMagicLevel boolean
+
+    // Magic level override
+    public bool OverrideMagicLevel { get; set; } = false;
+    public int MagicLevel { get; set; } = 0;
 
     public void RegisterGMCM(IModHelper helper, SpaceShared.APIs.IGenericModConfigMenuApi gmcm, IManifest manifest)
     {
@@ -23,13 +25,15 @@ public class ModConfig
                 ManaBarX = 1120;
                 ManaBarY = 500;
                 godMode = false;
-                MagicLevel = 0; // Default to 0 (natural progression)
+                OverrideMagicLevel = false;
+                MagicLevel = 0;
             },
             save: () =>
             {
                 helper.WriteConfig(this);
-                // Apply magic level change immediately when config is saved
-                ApplyMagicLevelChange();
+
+                if (OverrideMagicLevel)
+                    ApplyMagicLevelChange();
             }
         );
 
@@ -82,11 +86,20 @@ public class ModConfig
             setValue: val => godMode = val
         );
 
-        // Magic level - updated tooltip
+        // Override magic level toggle
+        gmcm.AddBoolOption(
+            mod: manifest,
+            name: () => "Override Magic Level",
+            tooltip: () => "If enabled, the Magic Level below will be forced when you save config.",
+            getValue: () => OverrideMagicLevel,
+            setValue: val => OverrideMagicLevel = val
+        );
+
+        // Magic level number
         gmcm.AddNumberOption(
             mod: manifest,
-            name: () => "Set Magic Level",
-            tooltip: () => "Set your Magic Level (0 = natural progression). Changes apply when you save config.",
+            name: () => "Magic Level",
+            tooltip: () => "Target Magic Level (0 = natural progression). Only applied if override is enabled.",
             getValue: () => MagicLevel,
             setValue: val => MagicLevel = val,
             min: 0,
@@ -96,13 +109,11 @@ public class ModConfig
 
     private static readonly int[] MagicXpPerLevel =
     {
-
-    100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000
-};
+        100, 380, 770, 1300, 2150, 3300, 4800, 6900, 10000, 15000
+    };
 
     private static int TotalXpForLevel(int level)
     {
-        // level is 0..10; returns total XP needed to be exactly at that level (floor)
         int total = 0;
         for (int i = 0; i < level && i < MagicXpPerLevel.Length; i++)
             total += MagicXpPerLevel[i];
@@ -116,33 +127,26 @@ public class ModConfig
 
         try
         {
-            if (MagicLevel <= 0)
-                return; // let natural progression handle <=0 per your comment
-
             const string skillId = "nemosmagicmod.Magic";
 
-            // Use whatever you already have to read the current level.
-            // If you have a getter, prefer that. Otherwise cache it, or derive it from your own stored XP.
             int currentLevel = SpaceCore.Skills.GetSkillLevel(Game1.player, skillId);
-
             int targetLevel = MagicLevel;
-            int currentFloorXp = TotalXpForLevel(currentLevel);
-            int targetFloorXp = TotalXpForLevel(targetLevel);
-            int delta = targetFloorXp - currentFloorXp; // negative if lowering
+
+            int currentXp = TotalXpForLevel(currentLevel);
+            int targetXp = TotalXpForLevel(targetLevel);
+            int delta = targetXp - currentXp;
 
             if (delta != 0)
             {
-                // Public SpaceCore API call – this compiles.
                 SpaceCore.Skills.AddExperience(Game1.player, skillId, delta);
             }
 
             NemosMagicMod.ModEntry.MagicLevel = targetLevel;
 
-            // Recalculate any dependent stats
             ManaManager.RecalculateMaxMana();
 
             Game1.addHUDMessage(new HUDMessage($"Magic Level set to {targetLevel}", HUDMessage.achievement_type));
-            NemosMagicMod.ModEntry.Instance?.Monitor?.Log($"Magic Level set to {targetLevel} via config", LogLevel.Info);
+            NemosMagicMod.ModEntry.Instance?.Monitor?.Log($"Magic Level set to {targetLevel} via config override", LogLevel.Info);
         }
         catch (System.Exception ex)
         {
