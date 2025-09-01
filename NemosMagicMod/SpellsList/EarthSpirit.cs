@@ -81,19 +81,10 @@ public class EarthSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
-        // --- Minimum spellbook tier check ---
-        if (!HasSufficientSpellbookTier(who))
-        {
-            string requiredTierName = MinimumTier.ToString();
-            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+        if (!CanCast(who))
             return;
-        }
 
-        if (!ManaManager.HasEnoughMana(ManaCost))
-        {
-            Game1.showRedMessage("Not enough mana!");
-            return;
-        }
+        base.Cast(who); 
 
         // Set duration based on current spellbook tier
         spellDuration = GetTierAdjustedDuration(who);
@@ -103,8 +94,6 @@ public class EarthSpirit : Spell, IRenderable
         var durationSeconds = (int)spellDuration;
         Game1.addHUDMessage(new HUDMessage($"Earth Spirit summoned for {durationSeconds}s ({currentTier} tier)", 2));
 
-        // Immediate base.Cast: mana, XP, spell activation
-        base.Cast(who);
 
         // Delay only the EarthSpirit visual/effects
         DelayedAction.functionAfterDelay(() =>

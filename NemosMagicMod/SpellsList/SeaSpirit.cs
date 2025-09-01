@@ -117,20 +117,9 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            if (!HasSufficientSpellbookTier(who))
-            {
-                string requiredTierName = MinimumTier.ToString();
-                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            if (!CanCast(who))
                 return;
-            }
 
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
-
-            // Always pay mana + do common base logic first
             base.Cast(who);
 
             var existingSeaSpirit = ModEntry.ActiveSpells.OfType<SeaSpirit>().FirstOrDefault();

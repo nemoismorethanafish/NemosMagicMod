@@ -23,20 +23,10 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            // --- Not Enough Mana check ---
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
+            if (!CanCast(who))
                 return;
-            }
 
-            // --- Minimum spellbook tier check ---
-            if (!HasSufficientSpellbookTier(who))
-            {
-                string requiredTierName = MinimumTier.ToString(); // "Adept"
-                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
-                return; // Cancel spell
-            }
+            base.Cast(who);
 
             // Check if already home BEFORE spending mana
             GameLocation home = Game1.getLocationFromName(who.homeLocation.Value) ?? Game1.getFarm();
@@ -48,9 +38,6 @@ namespace NemosMagicMod.Spells
                 );
                 return; // Exit early
             }
-
-            // --- Base cast (spends mana, triggers standard effects) ---
-            base.Cast(who);
 
             // --- Delay everything by 1 second (1000ms) ---
             DelayedAction.functionAfterDelay(() =>

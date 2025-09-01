@@ -36,13 +36,10 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            // --- Minimum spellbook tier check ---
-            if (!HasSufficientSpellbookTier(who))
-            {
-                string requiredTierName = MinimumTier.ToString();
-                Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+            if (!CanCast(who))
                 return;
-            }
+
+            base.Cast(who);
 
             // --- Generate unique day ID ---
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
@@ -72,9 +69,6 @@ namespace NemosMagicMod.Spells
                 Game1.showRedMessage("Not enough mana!");
                 return;
             }
-
-            // --- Base cast (spends mana, triggers standard effects) ---
-            base.Cast(who);
 
             // --- Record usage ---
             if (!normalUsedToday)

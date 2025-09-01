@@ -37,28 +37,16 @@ public class FireCyclone : Spell, Spell.IRenderable
 
     public override void Cast(Farmer who)
     {
-        // --- Not Enough Mana check ---
-        if (!ManaManager.HasEnoughMana(ManaCost))
-        {
-            Game1.showRedMessage("Not enough mana!");
+        if (!CanCast(who))
             return;
-        }
 
-        // --- Minimum spellbook tier check ---
-        if (!HasSufficientSpellbookTier(who))
-        {
-            string requiredTierName = MinimumTier.ToString(); // "Adept"
-            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
-            return; // Cancel spell
-        }
+        base.Cast(who);
 
         if (IsActive)
         {
             Game1.showRedMessage("Fire Cyclone is already active!");
             return;
         }
-
-        base.Cast(who);
 
         owner = who;
         currentLocation = who.currentLocation;

@@ -29,15 +29,10 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
+            if (!CanCast(who))
                 return;
-            }
 
             base.Cast(who);
-
-            NemosMagicMod.ModEntry.Instance.Monitor.Log("Fireball cast via spellbook!", LogLevel.Info);
 
             // Cursor world position
             Vector2 cursorScreenPos = new Vector2(Game1.getMouseX(), Game1.getMouseY());
@@ -69,7 +64,7 @@ namespace NemosMagicMod.Spells
             velocity *= 10f;
 
             var fireball = new BasicProjectile(
-                damageToFarmer: 25,
+                damageToFarmer: 5,
                 spriteIndex: 0,
                 bouncesTillDestruct: 0,
                 tailLength: 0,

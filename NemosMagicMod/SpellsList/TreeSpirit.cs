@@ -59,21 +59,9 @@ public class TreeSpirit : Spell, IRenderable
 
     public override void Cast(Farmer who)
     {
-        if (!HasSufficientSpellbookTier(who))
-        {
-            string requiredTierName = MinimumTier.ToString();
-            Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
+        if (!CanCast(who))
             return;
-        }
 
-        // --- Not Enough Mana check ---
-        if (!ManaManager.HasEnoughMana(ManaCost))
-        {
-            Game1.showRedMessage("Not enough mana!");
-            return;
-        }
-
-        // --- Spend mana / base cast immediately ---
         base.Cast(who);
 
         // --- Delay the summoning of the magical axe ---

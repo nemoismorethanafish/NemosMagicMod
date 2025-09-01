@@ -79,17 +79,8 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            if (!HasSufficientSpellbookTier(who))
-            {
-                Game1.showRedMessage($"Requires {MinimumTier} spellbook or higher!");
+            if (!CanCast(who))
                 return;
-            }
-
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
 
             base.Cast(who);
 

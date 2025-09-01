@@ -2,6 +2,7 @@
 using SpaceCore;
 using StardewValley;
 using System;
+using System.Linq;
 
 namespace NemosMagicMod
 {
@@ -34,6 +35,34 @@ namespace NemosMagicMod
         public static void Refill()
         {
             _currentMana = _maxMana;
+        }
+
+        // Add this method to recalculate mana based on current state
+        public static void RecalculateMaxMana()
+        {
+            if (Game1.player == null) return;
+
+            int baseMana = 100;
+            int totalMana = baseMana + 5 * ModEntry.MagicLevel;
+
+            // Check for ManaDork profession
+            try
+            {
+                int manaDorkID = Skills.GetSkill(ModEntry.SkillID).Professions
+                    .Single(p => p.Id == "ManaDork")
+                    .GetVanillaId();
+
+                if (Game1.player.professions.Contains(manaDorkID))
+                {
+                    totalMana += 50;
+                }
+            }
+            catch (Exception)
+            {
+                // Profession not found or other error - continue without bonus
+            }
+
+            SetMaxMana(totalMana);
         }
     }
 }

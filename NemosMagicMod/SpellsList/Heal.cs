@@ -14,11 +14,8 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
+            if (!CanCast(who))
                 return;
-            }
 
             base.Cast(who);
 

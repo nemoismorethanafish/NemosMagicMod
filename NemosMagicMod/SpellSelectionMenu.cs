@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using NemosMagicMod;
 using NemosMagicMod.Spells;
 using StardewModdingAPI;
 using StardewValley;
@@ -50,7 +51,7 @@ public class SpellSelectionMenu : IClickableMenu
     {
         spells.Clear();
         foreach (var spell in SpellRegistry.Spells)
-            if (SpellRegistry.PlayerData.IsSpellUnlocked(spell))
+            if (SpellRegistry.PlayerData.IsSpellUnlocked(spell, ModEntry.Instance.Config))
                 spells.Add(spell);
 
         if (SpellRegistry.SelectedSpell != null)

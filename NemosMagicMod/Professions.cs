@@ -7,17 +7,18 @@ using static SpaceCore.Skills;
 
 public static class Level5Professions
 {
-    public class ArcaneMaster : Skill.Profession
+    public class ManaDork : Skill.Profession
     {
-        public ArcaneMaster(Skill parentSkill)
-            : base(parentSkill, "ArcaneMaster") { }
+        public ManaDork(Skill parentSkill)
+            : base(parentSkill, "ManaDork") { }
 
-        public override string GetName() => "Arcane Master";
+        public override string GetName() => "Mana Dork";
         public override string GetDescription() => "+50 to your maximum Mana.";
 
         public override void DoImmediateProfessionPerk()
         {
-            // Placeholder for functionality: 
+            ManaManager.RecalculateMaxMana();
+            ManaManager.Refill();
         }
     }
 

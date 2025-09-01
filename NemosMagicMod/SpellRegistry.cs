@@ -2,7 +2,7 @@
 using NemosMagicMod.Spells;
 using System.Collections.Generic;
 
-public static class SpellRegistry //List of all spells
+public static class SpellRegistry // List of all spells
 {
     public static Spell SelectedSpell = WindSpirit;
 
@@ -21,13 +21,6 @@ public static class SpellRegistry //List of all spells
     public static Spell FertilitySpirit { get; } = new FertilitySpirit();
     public static Spell FireCyclone { get; } = new FireCyclone();
 
-
-
-
-
-
-
-
     // Add this list so the menu can render all spells
     public static List<Spell> Spells = new()
     {
@@ -45,25 +38,23 @@ public static class SpellRegistry //List of all spells
         FireCyclone
     };
 
-
-
-
     public static class PlayerData
     {
         public static HashSet<string> UnlockedSpellIds => ModEntry.SaveData.UnlockedSpellIds;
 
-        public static bool IsSpellUnlocked(Spell spell)
+        // Updated to require ModConfig
+        public static bool IsSpellUnlocked(Spell spell, ModConfig config)
         {
+            // God Mode unlocks everything
+            if (config.godMode)
+                return true;
+
+            // Always unlocked
             if (spell.Id == "nemo.WindSpirit" ||
                 spell.Id == "nemo.Heal")
-            {
                 return true;
-            }
 
             return UnlockedSpellIds.Contains(spell.Id);
         }
     }
-
-
-
 }

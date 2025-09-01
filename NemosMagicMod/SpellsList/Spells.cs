@@ -41,7 +41,7 @@ public abstract class Spell
         spellbookTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/spellbooktexture");
     }
 
-    public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this);
+    public virtual bool IsUnlocked => PlayerData.IsSpellUnlocked(this, ModEntry.Instance.Config);
 
     /// <summary>
     /// Gets the current spellbook tier from the player's inventory
@@ -83,22 +83,30 @@ public abstract class Spell
         return currentTier >= MinimumTier;
     }
 
-    /// <summary>Cast spell: animation happens first, then spell effects</summary>
-    public virtual void Cast(Farmer who)
+
+    public bool CanCast(Farmer who)
     {
-        // Check if player has a spellbook of sufficient tier
-        if (!HasSufficientSpellbookTier(who))
+        if (!HasSufficientSpellbookTier(who) && !ModEntry.Instance.Config.godMode)
         {
             string requiredTierName = MinimumTier.ToString();
             Game1.showRedMessage($"Requires {requiredTierName} spellbook or higher!");
-            return;
+            return false;
         }
 
-        if (!ManaManager.HasEnoughMana(ManaCost))
+        if (!ManaManager.HasEnoughMana(ManaCost) && !ModEntry.Instance.Config.godMode)
         {
             Game1.showRedMessage("Not enough mana!");
-            return;
+            return false;
         }
+
+        return true;
+    }
+
+    /// <summary>Cast spell: animation happens first, then spell effects</summary>
+    public virtual void Cast(Farmer who)
+    {
+        if (!CanCast(who))
+            return;
 
         if (UseBookAnimation)
         {
@@ -112,6 +120,7 @@ public abstract class Spell
             ApplySpellEffects(who);
         }
     }
+
 
     private void ApplySpellEffects(Farmer who)
     {

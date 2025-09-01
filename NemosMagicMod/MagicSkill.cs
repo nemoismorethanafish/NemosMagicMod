@@ -24,11 +24,11 @@ namespace MagicSkill
             // -----------------------------
             // Level 5 professions
             // -----------------------------
-            var arcaneMaster = new Level5Professions.ArcaneMaster(this);
+            var manaDork = new Level5Professions.ManaDork(this);
             var battleMage = new Level5Professions.BattleMage(this);
 
-            this.ProfessionsForLevels.Add(new ProfessionPair(5, arcaneMaster, battleMage, null));
-            this.Professions.Add(arcaneMaster);
+            this.ProfessionsForLevels.Add(new ProfessionPair(5, manaDork, battleMage, null));
+            this.Professions.Add(manaDork);
             this.Professions.Add(battleMage);
 
             // -----------------------------
@@ -39,7 +39,7 @@ namespace MagicSkill
             var bonusDaily = new Level10Professions.BonusDaily(this);
 
             // ArcaneMaster → ManaRegeneration or BonusDaily
-            this.ProfessionsForLevels.Add(new ProfessionPair(10, manaRegen, bonusDaily, arcaneMaster));
+            this.ProfessionsForLevels.Add(new ProfessionPair(10, manaRegen, bonusDaily, manaDork));
 
             // BattleMage → WarWizard or BonusDaily
             this.ProfessionsForLevels.Add(new ProfessionPair(10, warWizard, bonusDaily, battleMage));

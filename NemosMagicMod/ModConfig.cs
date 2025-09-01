@@ -6,6 +6,7 @@ public class ModConfig
     public SButton SpellSelectionKey { get; set; } = SButton.D9;
     public int ManaBarX { get; set; } = 1120;
     public int ManaBarY { get; set; } = 500;
+    public bool godMode { get; set; } = false;
 
     public void RegisterGMCM(IModHelper helper, SpaceShared.APIs.IGenericModConfigMenuApi gmcm, IManifest manifest)
     {
@@ -16,6 +17,7 @@ public class ModConfig
                 SpellSelectionKey = SButton.D9;
                 ManaBarX = 1120;
                 ManaBarY = 500;
+                godMode = false;
             },
             save: () => helper.WriteConfig(this)
         );
@@ -46,6 +48,14 @@ public class ModConfig
             setValue: val => ManaBarY = val,
             min: 0,
             max: Game1.uiViewport.Height
+        );
+
+        gmcm.AddBoolOption(
+            mod: manifest,
+            name: () => "God Mode",
+            tooltip: () => "Infinite Mana, no level reqs, etc.",
+            getValue: () => godMode,
+            setValue: val => godMode = val
         );
     }
 }

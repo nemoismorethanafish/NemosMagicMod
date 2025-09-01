@@ -98,52 +98,8 @@ namespace NemosMagicMod
                 }
                 return;
             }
-
-            // --- Debug: Open SpellbookUpgradeMenu with key 0 ---
-            if (e.Button == SButton.D0)
-            {
-                Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
-                if (spellbook != null)
-                {
-                    Game1.activeClickableMenu = new SpellbookUpgradeMenu(player, spellbook, Monitor);
-                }
-                else
-                {
-                    Game1.showRedMessage("No Spellbook found in inventory!");
-                }
-                return;
-            }
-
-            // --- Hardcoded right-click to trigger wizard interaction ---
-            if (e.Button == SButton.MouseRight)
-            {
-                // Compute the tile the player is facing
-                Vector2 playerTile = new Vector2((int)(player.Position.X / Game1.tileSize), (int)(player.Position.Y / Game1.tileSize));
-                Vector2 facingTile = playerTile + new Vector2(
-                    player.FacingDirection == 1 ? 1 : player.FacingDirection == 3 ? -1 : 0,
-                    player.FacingDirection == 0 ? -1 : player.FacingDirection == 2 ? 1 : 0
-                );
-
-                // Find Wizard at that tile
-                NPC wizard = Game1.currentLocation.characters
-                    .FirstOrDefault(n =>
-                        n.Name == "Wizard" &&
-                        Vector2.Distance(
-                            new Vector2((int)(n.Position.X / Game1.tileSize), (int)(n.Position.Y / Game1.tileSize)),
-                            facingTile
-                        ) < 1f
-                    );
-
-                if (wizard != null)
-                {
-                    Spellbook? spellbook = player.Items.OfType<Spellbook>().FirstOrDefault();
-                    if (spellbook != null)
-                        SpellbookUpgradeSystem.OfferWizardUpgrade(player, spellbook, Monitor);
-                    else
-                        Game1.showRedMessage("You don't have a Spellbook!");
-                }
-            }
         }
+
         private void TriggerBookAnimation(Farmer player)
         {
             if (player == null)
@@ -233,11 +189,11 @@ namespace NemosMagicMod
             int baseMana = 100;
             int totalMana = baseMana + 5 * MagicLevel;
 
-            // Get the profession ID for ArcaneMaster
-            int arcaneMasterId = GetProfessionId(SkillID, "ArcaneMaster");
+            // Get the profession ID for Mana Dork
+            int manaDorkID = GetProfessionId(SkillID, "ManaDork");
 
-            // Apply bonus if player has ArcaneMaster
-            if (Game1.player.professions.Contains(arcaneMasterId))
+            // Apply bonus if player has Mana Dork
+            if (Game1.player.professions.Contains(manaDorkID))
             {
                 totalMana += 50;
             }
@@ -345,6 +301,8 @@ namespace NemosMagicMod
             int manaRegenId = GetProfessionId(SkillID, "ManaRegeneration");
             if (Game1.player.professions.Contains(manaRegenId))
                 manaPerSecond += 1.0; // extra 1 mana/sec from profession
+            if (Config.godMode == true)
+                manaPerSecond += 50.0;
 
             double manaPerTick = manaPerSecond / 60.0; // SMAPI: 60 ticks/sec
             manaRegenAccumulator += manaPerTick;

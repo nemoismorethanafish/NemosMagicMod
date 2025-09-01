@@ -16,7 +16,7 @@ namespace NemosMagicMod.Spells
         public FireballCantrip()
             : base(
                 id: "nemo.Fireball",
-                name: "Fireball",
+                name: "Fireball Cantrip",
                 description: "Throws a fiery explosive projectile.",
                 manaCost: 0,
                 experienceGained: 0
@@ -29,11 +29,6 @@ namespace NemosMagicMod.Spells
 
         public override void Cast(Farmer who)
         {
-            if (!ManaManager.HasEnoughMana(ManaCost))
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
 
             base.Cast(who);
 
@@ -69,7 +64,7 @@ namespace NemosMagicMod.Spells
             velocity *= 10f;
 
             var fireball = new BasicProjectile(
-                damageToFarmer: 25,
+                damageToFarmer: 10,
                 spriteIndex: 0,
                 bouncesTillDestruct: 0,
                 tailLength: 0,
