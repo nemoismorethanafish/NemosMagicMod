@@ -84,7 +84,7 @@ namespace NemosMagicMod
             }
             if (ModEntry.MagicLevel >= 2 && !checkedUnlockLevel2)
             {
-                var spell = SpellRegistry.WaterSpirit;
+                var spell = SpellRegistry.Heal;
 
                 if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
                 {

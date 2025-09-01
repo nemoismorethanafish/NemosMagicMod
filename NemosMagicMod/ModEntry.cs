@@ -68,6 +68,7 @@ namespace NemosMagicMod
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
             helper.Events.GameLoop.DayStarted += OnDayStarted;
+            helper.Events.GameLoop.DayEnding += OnDayEnding;
             helper.Events.GameLoop.Saving += OnSaving;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Display.MenuChanged += OnMenuChanged;
@@ -281,6 +282,20 @@ namespace NemosMagicMod
             }
         }
 
+        private static void OnDayEnding(object sender, DayEndingEventArgs e)
+        {
+            if (Game1.player == null) return;
+
+            int leftoverMana = ManaManager.CurrentMana;
+
+            int leftoverManaXP = leftoverMana / 10;
+
+            // Add XP to custom Magic skill using SpaceCore helper
+            Skills.AddExperience(Game1.player, ModEntry.SkillID, leftoverManaXP);
+
+            // Refill mana for next day
+            ManaManager.Refill();
+        }
         private int GetProfessionId(string skill, string profession)
         {
             return Skills.GetSkill(skill).Professions
@@ -367,7 +382,7 @@ namespace NemosMagicMod
             }
 
             // --- Calculate mana regeneration ---
-            double manaPerSecond = 0.1 * MagicLevel; // natural regen
+            double manaPerSecond = 0.1 * MagicLevel + 0.1; // natural regen
             int manaRegenId = GetProfessionId(SkillID, "ManaRegeneration");
             if (Game1.player.professions.Contains(manaRegenId))
                 manaPerSecond += 1.0; // extra 1 mana/sec from profession

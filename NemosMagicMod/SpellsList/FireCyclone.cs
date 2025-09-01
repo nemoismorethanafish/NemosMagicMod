@@ -108,6 +108,7 @@ public class FireCyclone : Spell, Spell.IRenderable
         if (owner?.currentLocation == null) return;
 
         int spriteCount = 16;
+
         for (int i = 0; i < spriteCount; i++)
         {
             Color flameColor = new Color(
@@ -117,28 +118,26 @@ public class FireCyclone : Spell, Spell.IRenderable
             );
 
             var sprite = new TemporaryAnimatedSprite(
-                "LooseSprites\\Cursors",
-                new Rectangle(211, 428, 7, 6),
-                120f,
-                1,
-                9999,
-                owner.Position,
-                false,
-                false
-            )
-            {
-                scale = 3f,
-                color = flameColor,
-                layerDepth = 1f,
-                rotationChange = 0.03f,
-                alphaFade = 0f
-            };
+                "LooseSprites\\Cursors",        // built-in texture
+                new Rectangle(211, 428, 7, 6),  // heart sprite rectangle
+                120f,                            // animation interval
+                1,                               // animation length
+                9999,                            // number of loops
+                owner.Position,                  // starting position
+                false,                           // flipped
+                false                            // flicker
+            );
+
+            sprite.scale = 3f;
+            sprite.color = flameColor;
+            sprite.layerDepth = 1f;
+            sprite.rotationChange = 0.03f;
+            sprite.alphaFade = 0f;
 
             currentLocation.temporarySprites.Add(sprite);
             sprites.Add(sprite);
         }
     }
-
     public override void Update(GameTime gameTime, Farmer who)
     {
         if (!IsActive) return;

@@ -66,7 +66,7 @@ namespace NemosMagicMod.Spells
         protected override SpellbookTier MinimumTier => SpellbookTier.Novice;
 
         public WaterSpirit()
-            : base("water_spirit", "Water Spirit",
+            : base("nemo.WaterSpirit", "Water Spirit",
                   "Summons a friendly rain cloud that waters nearby crops.",
                   30, 25, false, "assets/raincloud.png")
         {
