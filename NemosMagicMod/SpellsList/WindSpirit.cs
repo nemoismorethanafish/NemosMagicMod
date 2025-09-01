@@ -64,13 +64,11 @@ namespace NemosMagicMod.Spells
                 if (who.buffs.IsApplied(BuffId))
                     who.buffs.Remove(BuffId);
 
-                Texture2D icon = NemosMagicMod.ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
-
                 var buff = new Buff(
                     id: BuffId,
                     displayName: "Wind Spirit",
-                    iconTexture: icon,
-                    iconSheetIndex: 0,
+                    iconTexture: Game1.buffsIcons, // Use game's buff icons
+                    iconSheetIndex: 9, // This is the speed buff icon
                     duration: durationMs,
                     effects: new BuffEffects { Speed = { Value = speedBuff } },
                     description: $"You feel lighter on your feet! (+{speedBuff} speed for {durationMs / 1000}s)"

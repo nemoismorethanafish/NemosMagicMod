@@ -5,6 +5,7 @@ using NemosMagicMod;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Buffs;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using System;
@@ -20,6 +21,9 @@ namespace NemosMagicMod.Spells
         private const int BubbleRadius = 5;
         private const float BubbleRiseSpeed = 60f;
         private const float BubbleFadeSpeed = 0.6f;
+        private const string BuffId = "NemosMagicMod_SeaSpirit"; // <-- Add this
+        private Texture2D buffIconTexture;
+
 
         // Tier-based scaling factors
         private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
@@ -49,12 +53,54 @@ namespace NemosMagicMod.Spells
         // Override minimum tier requirement
         protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
 
-        public SeaSpirit()
-            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 30, 25, false, "assets/bubbles.png")
+        private void ApplySeaSpiritBuff(Farmer who, float duration)
         {
-            bubbleTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/bubbles.png");
+            if (who.buffs.IsApplied(BuffId))
+                who.buffs.Remove(BuffId);
+
+            int durationMs = (int)(duration * 1000);
+            var tier = GetCurrentSpellbookTier(who);
+
+            var buff = new Buff(
+                id: BuffId,
+                displayName: "Sea Spirit",
+                iconTexture: buffIconTexture,
+                iconSheetIndex: 0,
+                duration: durationMs,
+                effects: new BuffEffects(), // Visual only
+                description: $"Magical bubbles increase fishing bite rates! ({tier} tier)"
+            );
+
+            who.buffs.Apply(buff);
+            ModEntry.Instance.Monitor.Log($"Sea Spirit buff applied for {duration}s ({tier} tier)", LogLevel.Info);
+        }
+
+        private void ApplyBuffRemoval(Farmer who)
+        {
+            if (who.buffs.IsApplied(BuffId))
+                who.buffs.Remove(BuffId);
+
+            Unsubscribe();
+        }
+
+
+
+        public SeaSpirit()
+            : base("nemo.SeaSpirit", "Sea Spirit", "Summons magical bubbles that increase fishing bite rates.", 30, 25, false, "assets/BubblesBuffIcon.png")
+        {
+            try
+            {
+                bubbleTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/bubbles.png");
+                buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/BubblesBuffIcon.png");
+                iconTexture = bubbleTexture;
+            }
+            catch (Exception ex)
+            {
+                ModEntry.Instance.Monitor.Log($"Failed to load SeaSpirit textures: {ex}", LogLevel.Error);
+                buffIconTexture = bubbleTexture;
+            }
+
             ApplyHarmonyPatches();
-            iconTexture = bubbleTexture;
         }
 
         public bool IsActive => bubbleTimer > 0f;
@@ -122,6 +168,8 @@ namespace NemosMagicMod.Spells
                 return;
 
             base.Cast(who);
+
+            ApplySeaSpiritBuff(who, currentSpellDuration);
 
             var existingSeaSpirit = ModEntry.ActiveSpells.OfType<SeaSpirit>().FirstOrDefault();
             var currentTier = GetCurrentSpellbookTier(who);

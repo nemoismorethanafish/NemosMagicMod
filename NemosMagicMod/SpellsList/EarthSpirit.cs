@@ -2,8 +2,10 @@
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using NemosMagicMod.Spells;
+using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Buffs;
 using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
@@ -14,7 +16,9 @@ using static Spell;
 
 public class EarthSpirit : Spell, IRenderable
 {
+    private const string BuffId = "NemosMagicMod_EarthSpirit";
     private Texture2D pickaxeTexture;
+    private Texture2D buffIconTexture;
     private Pickaxe pickaxe;
 
     private bool subscribed = false;
@@ -26,7 +30,6 @@ public class EarthSpirit : Spell, IRenderable
     private readonly float hoverHeight = 32f;
 
     protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
-
 
     // Tier-based duration multipliers
     private readonly Dictionary<SpellbookTier, float> durationMultipliers = new()
@@ -59,10 +62,22 @@ public class EarthSpirit : Spell, IRenderable
             30,
             25,
             false,
-            "assets/EarthSpiritPickaxe.png") 
+            "assets/EarthSpiritPickaxe.png")
     {
-        pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
-        iconTexture = pickaxeTexture;
+        try
+        {
+            pickaxeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxe.png");
+            buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/EarthSpiritPickaxeBuffIcon.png");
+            iconTexture = pickaxeTexture;
+
+            ModEntry.Instance.Monitor.Log($"EarthSpirit textures loaded - Pickaxe: {pickaxeTexture?.Width}x{pickaxeTexture?.Height}, BuffIcon: {buffIconTexture?.Width}x{buffIconTexture?.Height}", LogLevel.Info);
+        }
+        catch (Exception ex)
+        {
+            ModEntry.Instance.Monitor.Log($"Failed to load EarthSpirit textures: {ex.Message}", LogLevel.Error);
+            // Fallback to pickaxe texture for both if buff icon fails to load
+            buffIconTexture = pickaxeTexture;
+        }
     }
 
     public void Unsubscribe()
@@ -72,6 +87,12 @@ public class EarthSpirit : Spell, IRenderable
         ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
         ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
         subscribed = false;
+
+        // Remove buff when spell ends
+        if (owner != null && owner.buffs.IsApplied(BuffId))
+        {
+            owner.buffs.Remove(BuffId);
+        }
     }
 
     /// <summary>
@@ -84,12 +105,39 @@ public class EarthSpirit : Spell, IRenderable
         return 20f * multiplier; // Base 20 seconds * tier multiplier
     }
 
+    private void ApplyEarthSpiritBuff(Farmer who, float duration)
+    {
+        // Remove existing Earth Spirit buff if present
+        if (who.buffs.IsApplied(BuffId))
+            who.buffs.Remove(BuffId);
+
+        // Convert spell duration to milliseconds
+        int durationMs = (int)(duration * 1000);
+
+        // Debug the texture being used
+        ModEntry.Instance.Monitor.Log($"Applying Earth Spirit buff with texture: {buffIconTexture?.Width}x{buffIconTexture?.Height}", LogLevel.Info);
+
+        var currentTier = GetCurrentSpellbookTier(who);
+        var buff = new Buff(
+            id: BuffId,
+            displayName: "Earth Spirit",
+            iconTexture: buffIconTexture, // Use the small 16x16 buff icon
+            iconSheetIndex: 0,
+            duration: durationMs,
+            effects: new BuffEffects(), // No stat effects, just visual indicator
+            description: $"A magical pickaxe is mining rocks for you! ({currentTier} tier)"
+        );
+
+        who.buffs.Apply(buff);
+        ModEntry.Instance.Monitor.Log($"Earth Spirit buff applied for {duration} seconds ({currentTier} tier)", LogLevel.Info);
+    }
+
     public override void Cast(Farmer who)
     {
         if (!CanCast(who))
             return;
 
-        base.Cast(who); 
+        base.Cast(who);
 
         // Set duration based on current spellbook tier
         spellDuration = GetTierAdjustedDuration(who);
@@ -98,7 +146,6 @@ public class EarthSpirit : Spell, IRenderable
         var currentTier = GetCurrentSpellbookTier(who);
         var durationSeconds = (int)spellDuration;
         Game1.addHUDMessage(new HUDMessage($"Earth Spirit summoned for {durationSeconds}s ({currentTier} tier)", 2));
-
 
         // Delay only the EarthSpirit visual/effects
         DelayedAction.functionAfterDelay(() =>
@@ -117,6 +164,9 @@ public class EarthSpirit : Spell, IRenderable
             currentTargetTile = null;
             isReturning = false;
             toolPosition = who.Position + new Vector2(0, -64f);
+
+            // Apply the buff
+            ApplyEarthSpiritBuff(who, spellDuration);
 
             // Subscribe to events
             ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;

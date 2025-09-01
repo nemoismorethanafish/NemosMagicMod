@@ -2,8 +2,8 @@
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using NemosMagicMod.Spells;
-using SpaceCore;
 using StardewValley;
+using StardewValley.Buffs;
 using StardewValley.Monsters;
 using StardewValley.Tools;
 using System;
@@ -12,6 +12,7 @@ using System.Linq;
 
 public class FireCyclone : Spell, Spell.IRenderable
 {
+    private const string BuffId = "NemosMagicMod_FireCyclone";
     private const float Radius = 256f;
     private const float PushStrength = 12f;
     private const int DurationMs = 30000;
@@ -23,6 +24,7 @@ public class FireCyclone : Spell, Spell.IRenderable
     private float rotation = 0f;
     private GameLocation currentLocation;
     private Texture2D magmaTexture;
+    private Texture2D buffIconTexture;
 
     protected override SpellbookTier MinimumTier => SpellbookTier.Adept;
 
@@ -34,10 +36,12 @@ public class FireCyclone : Spell, Spell.IRenderable
             manaCost: 100,
             experienceGained: 50,
             false,
-            "assets/MagmaSparker.png"
+            iconPath: "assets/MagmaSparker.png"
         )
     {
         magmaTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/MagmaSparker.png");
+        buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/FireCycloneBuffIcon.png");
+
         iconTexture = magmaTexture;
     }
 
@@ -63,43 +67,71 @@ public class FireCyclone : Spell, Spell.IRenderable
         // Clear any existing sprites
         sprites.Clear();
 
-        // Create the cyclone sprites similar to ActiveCyclone
+        // Apply Buff
+        ApplyFireCycloneBuff(owner);
+
+        // Create the cyclone sprites
         CreateCycloneSprites();
+
+        Game1.playSound("fireball");
+    }
+
+    private void ApplyFireCycloneBuff(Farmer who)
+    {
+        // Remove existing buff if present
+        if (who.buffs.IsApplied(BuffId))
+            who.buffs.Remove(BuffId);
+
+        var buff = new Buff(
+            id: BuffId,
+            displayName: "Fire Cyclone",
+            iconTexture: buffIconTexture,
+            iconSheetIndex: 0,
+            duration: DurationMs,
+            effects: new BuffEffects(), // purely cosmetic
+            description: "A swirling cyclone of fire surrounds you!"
+        );
+
+        who.buffs.Apply(buff);
+    }
+
+    private void RemoveFireCycloneBuff(Farmer who)
+    {
+        if (who?.buffs?.IsApplied(BuffId) == true)
+        {
+            who.buffs.Remove(BuffId);
+        }
     }
 
     private void CreateCycloneSprites()
     {
         if (owner?.currentLocation == null) return;
 
-        // Create 16 flame sprites in a circle (similar to ActiveCyclone's 24)
         int spriteCount = 16;
-
         for (int i = 0; i < spriteCount; i++)
         {
-            // Random fire colors (orange/red/yellow)
             Color flameColor = new Color(
                 255,
-                random.Next(140, 255), // Green component for orange/red
-                random.Next(0, 100)    // Blue component for fire effect
+                random.Next(140, 255),
+                random.Next(0, 100)
             );
 
-            // Use a known working sprite - hearts from cursors work reliably
             var sprite = new TemporaryAnimatedSprite(
-                textureName: "LooseSprites\\Cursors",
-                sourceRect: new Rectangle(211, 428, 7, 6), // Heart sprite
-                animationInterval: 120f,
-                animationLength: 1,
-                numberOfLoops: 9999, // Loop indefinitely
-                position: owner.Position, // Will be updated in Update()
-                flicker: false,
-                flipped: false
+                "LooseSprites\\Cursors",
+                new Rectangle(211, 428, 7, 6),
+                120f,
+                1,
+                9999,
+                owner.Position,
+                false,
+                false
             )
             {
                 scale = 3f,
                 color = flameColor,
                 layerDepth = 1f,
                 rotationChange = 0.03f,
-                alphaFade = 0f // Don't fade until we want to end
+                alphaFade = 0f
             };
 
             currentLocation.temporarySprites.Add(sprite);
@@ -119,52 +151,36 @@ public class FireCyclone : Spell, Spell.IRenderable
             return;
         }
 
-        // Update rotation (similar to ActiveCyclone)
         rotation += 0.03f;
 
-        // Update sprite positions in a circle around the player
         for (int i = 0; i < sprites.Count; i++)
         {
-            float angle = rotation + (float)Math.PI * 2f * (float)i / (float)sprites.Count;
-            Vector2 offset = new Vector2(
-                (float)Math.Cos(angle),
-                (float)Math.Sin(angle)
-            ) * 192f; // Use same distance as ActiveCyclone (192f)
+            float angle = rotation + MathHelper.TwoPi * i / sprites.Count;
+            Vector2 offset = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 192f;
 
-            // Use exact same positioning as ActiveCyclone
             sprites[i].position = owner.Position + offset + new Vector2(0f, -24f);
         }
 
-        // Handle location changes
         if (owner.currentLocation != currentLocation)
         {
             OnLocationChanged();
         }
 
-        // Damage and knockback monsters
         DamageMonstersInArea();
-
-        // Optional: Break objects like the original ActiveCyclone
-        // BreakObjectsInArea();
     }
 
     private void OnLocationChanged()
     {
-        // Remove sprites from old location and add to new location
         currentLocation = owner.currentLocation;
-
         foreach (var sprite in sprites)
-        {
             currentLocation.temporarySprites.Add(sprite);
-        }
     }
 
     private void DamageMonstersInArea()
     {
         if (owner?.currentLocation == null) return;
 
-        // Create a weapon for damage calculation (similar to ActiveCyclone)
-        var weapon = new MeleeWeapon("17") // Steel Falchion ID
+        var weapon = new MeleeWeapon("17")
         {
             minDamage = { Value = 15 },
             maxDamage = { Value = 25 },
@@ -173,15 +189,11 @@ public class FireCyclone : Spell, Spell.IRenderable
             critMultiplier = { Value = 2f }
         };
 
-        var monsters = currentLocation.characters.OfType<Monster>().ToList();
-
-        foreach (var monster in monsters)
+        foreach (var monster in currentLocation.characters.OfType<Monster>())
         {
             float distance = Vector2.Distance(monster.Position, owner.Position);
-
             if (distance <= Radius)
             {
-                // Damage the monster
                 Rectangle damageArea = new Rectangle(
                     (int)(owner.Position.X - Radius),
                     (int)(owner.Position.Y - Radius),
@@ -193,7 +205,7 @@ public class FireCyclone : Spell, Spell.IRenderable
                     damageArea,
                     weapon.minDamage.Value,
                     weapon.maxDamage.Value,
-                    false, // isBomb
+                    false,
                     weapon.knockback.Value,
                     weapon.addedPrecision.Value,
                     weapon.critChance.Value,
@@ -202,66 +214,30 @@ public class FireCyclone : Spell, Spell.IRenderable
                     owner
                 );
 
-                // Apply knockback
                 Vector2 knockbackDirection = Vector2.Normalize(monster.Position - owner.Position) * PushStrength;
                 monster.setTrajectory((int)knockbackDirection.X, (int)knockbackDirection.Y);
             }
         }
     }
 
-    //private void BreakObjectsInArea()
-    //{
-    //    if (owner?.currentLocation == null) return;
-
-    //    // Create a pickaxe for breaking objects (like ActiveCyclone)
-    //    var pickaxe = new Pickaxe { UpgradeLevel = 3 };
-
-    //    var objectsToCheck = currentLocation.objects.Keys.ToList();
-
-    //    foreach (var tilePos in objectsToCheck)
-    //    {
-    //        var obj = currentLocation.objects[tilePos];
-    //        if (obj == null) continue;
-
-    //        string objName = obj.Name?.ToLower() ?? "";
-
-    //        // Check if it's a breakable object
-    //        if (objName.Contains("stone") || objName.Contains("rock") ||
-    //            objName.Contains("node") || objName.Contains("crate") ||
-    //            objName.Contains("barrel") || objName.Contains("box") ||
-    //            objName.Contains("weed") || objName.Contains("litter"))
-    //        {
-    //            Vector2 objectWorldPos = tilePos * 64f + new Vector2(32f, 32f);
-
-    //            if (Vector2.Distance(owner.Position, objectWorldPos) < Radius)
-    //            {
-    //                float originalStamina = owner.stamina;
-    //                pickaxe.DoFunction(currentLocation, (int)(tilePos.X * 64f), (int)(tilePos.Y * 64f), 0, owner);
-    //                owner.stamina = originalStamina; // Restore stamina
-    //            }
-    //        }
-    //    }
-    //}
-
     private void EndCyclone()
     {
         IsActive = false;
         timer = 0f;
 
-        // Fade out all sprites
         foreach (var sprite in sprites)
-        {
             sprite.alphaFade = 0.05f;
-        }
 
         sprites.Clear();
+
+        RemoveFireCycloneBuff(owner);
+
+        Game1.addHUDMessage(new HUDMessage("Fire Cyclone dissipated.", 1));
     }
 
     public void Unsubscribe()
     {
         if (IsActive)
-        {
             EndCyclone();
-        }
     }
 }

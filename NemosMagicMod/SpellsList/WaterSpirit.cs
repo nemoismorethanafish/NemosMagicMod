@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Buffs;
 using System;
 using System.Collections.Generic;
 using static Spell;
@@ -11,8 +12,11 @@ namespace NemosMagicMod.Spells
 {
     public class WaterSpirit : Spell, IRenderable
     {
+        private const string BuffId = "NemosMagicMod_WaterSpirit";
+
         private Texture2D cloudTexture;
         private Texture2D splashTexture;
+        private Texture2D buffIconTexture;
 
         private bool subscribed = false;
 
@@ -68,6 +72,7 @@ namespace NemosMagicMod.Spells
         {
             cloudTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/raincloud.png");
             splashTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/WaterSplash.png");
+            buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/RaincloudBuffIcon.png");
             iconTexture = cloudTexture;
         }
 
@@ -77,6 +82,32 @@ namespace NemosMagicMod.Spells
             float multiplier = durationMultipliers.GetValueOrDefault(tier, 1f);
             return 10f * multiplier; // base 10 seconds * tier multiplier
         }
+        private void ApplyWaterSpiritBuff(Farmer who)
+        {
+            if (who.buffs.IsApplied(BuffId))
+                who.buffs.Remove(BuffId);
+
+            int durationMs = (int)(spellDuration * 1000);
+
+            var buff = new Buff(
+                id: BuffId,
+                displayName: "Water Spirit",
+                iconTexture: buffIconTexture,
+                iconSheetIndex: 0,
+                duration: durationMs,
+                effects: new BuffEffects(), // Visual only
+                description: $"A magical cloud waters crops for {spellDuration:F1}s"
+            );
+
+            who.buffs.Apply(buff);
+            ModEntry.Instance.Monitor.Log($"Water Spirit buff applied for {spellDuration:F1}s", StardewModdingAPI.LogLevel.Info);
+        }
+
+        private void RemoveWaterSpiritBuff(Farmer who)
+        {
+            if (who.buffs.IsApplied(BuffId))
+                who.buffs.Remove(BuffId);
+        }
 
         public override void Cast(Farmer who)
         {
@@ -84,6 +115,8 @@ namespace NemosMagicMod.Spells
                 return;
 
             base.Cast(who);
+
+            ApplyWaterSpiritBuff(who);
 
             // Apply tier-based duration
             spellDuration = GetTierAdjustedDuration(who);

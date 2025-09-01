@@ -146,7 +146,7 @@ public class SpellSelectionMenu : IClickableMenu
             // Draw icon
             if (spells[i] != null)
             {
-                Vector2 iconPos = new Vector2(pos.X + iconSize / 2, pos.Y + 17); // vertically center in row
+                Vector2 iconPos = new Vector2(pos.X + iconSize / 2, pos.Y + 12); // vertically center in row
                 spells[i].DrawIcon(b, iconPos, iconSize / (float)spells[i].IconWidth); // scale to fit iconSize
             }
 

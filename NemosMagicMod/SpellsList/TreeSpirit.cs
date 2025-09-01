@@ -2,19 +2,22 @@
 using Microsoft.Xna.Framework.Graphics;
 using NemosMagicMod;
 using NemosMagicMod.Spells;
+using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Buffs;
 using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using System;
 using static Spell;
 
-
 //Currently spawning sprites at the farmer when the axe hits a tree
 
 public class TreeSpirit : Spell, IRenderable
 {
+    private const string BuffId = "NemosMagicMod_TreeSpirit";
     private Texture2D axeTexture;
+    private Texture2D buffIconTexture;
     private Farmer owner;
     private bool subscribed = false;
 
@@ -39,7 +42,6 @@ public class TreeSpirit : Spell, IRenderable
 
     protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
 
-
     public TreeSpirit()
         : base("spirit_tree", "Tree Spirit",
               "Summons a magical axe that chops trees.",
@@ -47,6 +49,7 @@ public class TreeSpirit : Spell, IRenderable
               "assets/TreeSpiritAxe.png") // <-- fixed constructor
     {
         axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
+        buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritBuffIcon.png");
         iconTexture = axeTexture;
     }
 
@@ -57,6 +60,12 @@ public class TreeSpirit : Spell, IRenderable
         ModEntry.Instance.Helper.Events.Display.RenderedWorld -= OnRenderedWorld;
         ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
         subscribed = false;
+
+        // Remove buff when spell ends
+        if (owner != null && owner.buffs.IsApplied(BuffId))
+        {
+            owner.buffs.Remove(BuffId);
+        }
     }
 
     public override void Cast(Farmer who)
@@ -76,6 +85,9 @@ public class TreeSpirit : Spell, IRenderable
             axePosition = who.Position + new Vector2(0, -64f);
             isReturning = false;
 
+            // Apply the buff
+            ApplyTreeSpiritBuff(who);
+
             if (!subscribed)
             {
                 ModEntry.Instance.Helper.Events.Display.RenderedWorld += OnRenderedWorld;
@@ -86,6 +98,29 @@ public class TreeSpirit : Spell, IRenderable
             Game1.playSound("axe");
 
         }, 1000); // 1-second delay
+    }
+
+    private void ApplyTreeSpiritBuff(Farmer who)
+    {
+        // Remove existing Tree Spirit buff if present
+        if (who.buffs.IsApplied(BuffId))
+            who.buffs.Remove(BuffId);
+
+        // Convert spell duration to milliseconds
+        int durationMs = (int)(spellDuration * 1000);
+
+        var buff = new Buff(
+            id: BuffId,
+            displayName: "Tree Spirit",
+            iconTexture: buffIconTexture, // Use the same texture as the spell icon
+            iconSheetIndex: 0,
+            duration: durationMs,
+            effects: new BuffEffects(), // No stat effects, just visual indicator
+            description: "A magical axe is chopping trees for you!"
+        );
+
+        who.buffs.Apply(buff);
+        ModEntry.Instance.Monitor.Log($"Tree Spirit buff applied for {spellDuration} seconds", LogLevel.Info);
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -174,7 +209,6 @@ public class TreeSpirit : Spell, IRenderable
                 isReturning = false;
             }
         }
-
     }
 
     private Vector2? FindNearestTree()
