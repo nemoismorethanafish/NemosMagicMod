@@ -205,7 +205,11 @@ public class TreeSpirit : Spell, IRenderable
 
         Axe axe = new();
         Vector2 pixelPos = tile * Game1.tileSize + new Vector2(Game1.tileSize / 2, Game1.tileSize / 2);
+
+        // Save stamina before swinging
+        float oldStamina = owner.stamina;
         axe.DoFunction(Game1.currentLocation, (int)pixelPos.X, (int)pixelPos.Y, 1, owner);
+        owner.stamina = oldStamina; // Restore stamina to prevent drain
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)

@@ -8,7 +8,6 @@ namespace NemosMagicMod.Spells
 {
     public class Fireball : Spell
     {
-        public override bool IsUnlocked => SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id);
         protected override bool UseBookAnimation => false;        // skip book animation
         protected override bool FreezePlayerDuringCast => false;
 

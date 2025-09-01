@@ -8,14 +8,13 @@ namespace NemosMagicMod.Spells
 {
     public class FireballCantrip : Spell
     {
-        public override bool IsUnlocked => SpellRegistry.PlayerData.UnlockedSpellIds.Contains(this.Id);
-        protected override bool UseBookAnimation => false;        // skip book animation
+        protected override bool UseBookAnimation => false;
         protected override bool FreezePlayerDuringCast => false;
 
 
         public FireballCantrip()
             : base(
-                id: "nemo.Fireball",
+                id: "nemo.FireballCantrip",
                 name: "Fireball Cantrip",
                 description: "Throws a fiery explosive projectile.",
                 manaCost: 0,

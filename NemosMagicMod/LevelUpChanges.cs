@@ -1,5 +1,10 @@
-﻿using StardewModdingAPI;
+﻿using NemosMagicMod.Spells;
+using SpaceCore;
+using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewValley;
+using System.Linq;
+using static SpaceCore.Skills;
 
 namespace NemosMagicMod
 {
@@ -7,6 +12,7 @@ namespace NemosMagicMod
     {
         private readonly IMonitor Monitor;
         private readonly IModHelper Helper;
+        private bool checkedUnlockLevel1 = false;
         private bool checkedUnlockLevel2 = false;
         private bool checkedUnlockLevel3 = false;
         private bool checkedUnlockLevel4 = false;
@@ -23,12 +29,59 @@ namespace NemosMagicMod
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
         }
 
+        private int GetProfessionId(string skill, string profession)
+        {
+            return Skills.GetSkill(skill).Professions
+                         .Single(p => p.Id == profession)
+                         .GetVanillaId();
+        }
+
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
         {
             if (!Context.IsWorldReady)
                 return;
 
-            // Only proceed once magic level has stabilized
+            if (ModEntry.MagicLevel >= 1 && !checkedUnlockLevel1)
+            {
+                try
+                {
+                    int battleMageID = GetProfessionId(ModEntry.SkillID, "BattleMage");
+                    bool hasBattleMage = battleMageID != -1 && Game1.player.professions.Contains(battleMageID);
+
+                    if (!hasBattleMage)
+                    {
+                        // Unlock regular Fireball
+                        var spell = SpellRegistry.Fireball;
+                        if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
+                        {
+                            SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
+                            Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
+                        }
+
+                        // Make sure FireballCantrip is NOT unlocked
+                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.FireballCantrip.Id);
+                    }
+                    else
+                    {
+                        // Player has Battle Mage - ensure only FireballCantrip is unlocked
+                        var cantripSpell = SpellRegistry.FireballCantrip;
+                        if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(cantripSpell.Id))
+                        {
+                            SpellRegistry.PlayerData.UnlockedSpellIds.Add(cantripSpell.Id);
+                            Monitor.Log($"{cantripSpell.Name} spell unlocked via Battle Mage profession!", LogLevel.Info);
+                        }
+
+                        // Make sure regular Fireball is NOT unlocked
+                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Monitor.Log($"Error in level 1 spell unlock: {ex.Message}", LogLevel.Error);
+                }
+
+                checkedUnlockLevel1 = true;
+            }
             if (ModEntry.MagicLevel >= 2 && !checkedUnlockLevel2)
             {
                 var spell = SpellRegistry.WaterSpirit;

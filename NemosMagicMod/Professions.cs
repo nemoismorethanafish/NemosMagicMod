@@ -32,10 +32,11 @@ public static class Level5Professions
 
         public override void DoImmediateProfessionPerk()
         {
-            // Lock original Fireball
-            SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
+            if (SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.Fireball.Id))
+            {
+                SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
+            }
 
-            // Unlock FireballCantrip
             if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(SpellRegistry.FireballCantrip.Id))
             {
                 SpellRegistry.PlayerData.UnlockedSpellIds.Add(SpellRegistry.FireballCantrip.Id);

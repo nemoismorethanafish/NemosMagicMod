@@ -6,6 +6,7 @@ using NemosMagicMod.Spells;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,6 +18,7 @@ public class SpellSelectionMenu : IClickableMenu
 
     private List<Spell> spells = new();
     private int selectedSpellIndex = 0;
+    private bool needsRefresh = true; // Flag to track when we need to refresh
 
     private const int maxPerColumn = 8;
     private const int spellSpacing = 40;
@@ -32,6 +34,7 @@ public class SpellSelectionMenu : IClickableMenu
         this.monitor = monitor;
         this.playerSpellbook = spellbook;
 
+        // Always refresh when menu is created
         RefreshSpellList();
 
         int buttonWidth = 180;
@@ -49,12 +52,23 @@ public class SpellSelectionMenu : IClickableMenu
 
     private void RefreshSpellList()
     {
+        var previousSpellCount = spells.Count;
+        var previousSelectedSpell = selectedSpellIndex < spells.Count ? spells[selectedSpellIndex] : null;
+
         spells.Clear();
         foreach (var spell in SpellRegistry.Spells)
+        {
             if (SpellRegistry.PlayerData.IsSpellUnlocked(spell, ModEntry.Instance.Config))
                 spells.Add(spell);
+        }
 
-        if (SpellRegistry.SelectedSpell != null)
+        // Try to maintain the same selected spell after refresh
+        if (previousSelectedSpell != null)
+        {
+            int index = spells.FindIndex(s => s.Id == previousSelectedSpell.Id);
+            selectedSpellIndex = index >= 0 ? index : 0;
+        }
+        else if (SpellRegistry.SelectedSpell != null)
         {
             int index = spells.FindIndex(s => s.Id == SpellRegistry.SelectedSpell.Id);
             selectedSpellIndex = index >= 0 ? index : 0;
@@ -63,11 +77,33 @@ public class SpellSelectionMenu : IClickableMenu
         {
             selectedSpellIndex = 0;
         }
+
+        // Ensure selectedSpellIndex is within bounds
+        if (selectedSpellIndex >= spells.Count)
+            selectedSpellIndex = Math.Max(0, spells.Count - 1);
+
+        needsRefresh = false;
+
+        // Log if spell list changed (for debugging)
+        if (previousSpellCount != spells.Count)
+        {
+            monitor.Log($"Spell list refreshed: {spells.Count} spells available", LogLevel.Debug);
+        }
+    }
+
+    // Public method to trigger refresh from outside
+    public void ForceRefresh()
+    {
+        needsRefresh = true;
     }
 
     public override void draw(SpriteBatch b)
     {
-        RefreshSpellList();
+        // Only refresh if needed, not every frame
+        if (needsRefresh)
+        {
+            RefreshSpellList();
+        }
 
         int mouseX = Game1.getMouseX();
         int mouseY = Game1.getMouseY();
@@ -112,6 +148,16 @@ public class SpellSelectionMenu : IClickableMenu
             if (isHovered) hoveredSpell = spells[i];
         }
 
+        // Show message if no spells available
+        if (spells.Count == 0)
+        {
+            string noSpellsText = "No spells available";
+            Vector2 noSpellsTextSize = Game1.smallFont.MeasureString(noSpellsText);
+            b.DrawString(Game1.smallFont, noSpellsText,
+                new Vector2(xPositionOnScreen + width / 2 - noSpellsTextSize.X / 2, yPositionOnScreen + height / 2 - noSpellsTextSize.Y / 2),
+                Color.Gray);
+        }
+
         // Tooltip
         if (hoveredSpell != null)
         {
@@ -150,6 +196,9 @@ public class SpellSelectionMenu : IClickableMenu
             return;
         }
 
+        // Don't allow selection if no spells available
+        if (spells.Count == 0) return;
+
         int columnWidth = width / 2 - 40;
         for (int i = 0; i < spells.Count; i++)
         {
@@ -176,6 +225,14 @@ public class SpellSelectionMenu : IClickableMenu
 
     public override void receiveKeyPress(Keys key)
     {
+        // Don't allow navigation if no spells available
+        if (spells.Count == 0)
+        {
+            if (key == Keys.Escape)
+                Game1.exitActiveMenu();
+            return;
+        }
+
         if (key == Keys.Up)
         {
             if (selectedSpellIndex % maxPerColumn > 0) selectedSpellIndex--;
@@ -199,13 +256,21 @@ public class SpellSelectionMenu : IClickableMenu
         }
         else if (key == Keys.Enter)
         {
-            spells[selectedSpellIndex].Cast(Game1.player);
-            Game1.exitActiveMenu();
-            Game1.playSound("coin");
+            if (selectedSpellIndex < spells.Count)
+            {
+                spells[selectedSpellIndex].Cast(Game1.player);
+                Game1.exitActiveMenu();
+                Game1.playSound("coin");
+            }
         }
         else if (key == Keys.Escape)
         {
             Game1.exitActiveMenu();
+        }
+        else if (key == Keys.F5) // Add F5 to manually refresh (useful for debugging)
+        {
+            needsRefresh = true;
+            Game1.playSound("shiny4");
         }
     }
 }

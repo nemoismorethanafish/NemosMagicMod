@@ -166,8 +166,46 @@ namespace NemosMagicMod
         {
             SaveData = Helper.Data.ReadSaveData<PlayerSaveData>("player-save-data") ?? new PlayerSaveData();
             Monitor.Log("✅ Save data loaded.", LogLevel.Info);
+
+            // Clean up any conflicting spells after loading
+            Helper.Events.GameLoop.UpdateTicked += CleanupConflictingSpells;
         }
 
+        private void CleanupConflictingSpells(object? sender, UpdateTickedEventArgs e)
+        {
+            Helper.Events.GameLoop.UpdateTicked -= CleanupConflictingSpells;
+
+            if (Game1.player == null) return;
+
+            try
+            {
+                int battleMageID = GetProfessionId(SkillID, "BattleMage");
+                bool hasBattleMage = Game1.player.professions.Contains(battleMageID);
+
+                bool hasFireball = SaveData.UnlockedSpellIds.Contains(SpellRegistry.Fireball.Id);
+                bool hasCantrip = SaveData.UnlockedSpellIds.Contains(SpellRegistry.FireballCantrip.Id);
+
+                if (hasFireball && hasCantrip)
+                {
+                    Monitor.Log("Found conflicting Fireball spells, cleaning up...", LogLevel.Info);
+
+                    if (hasBattleMage)
+                    {
+                        SaveData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
+                        Monitor.Log("Removed regular Fireball (player has Battle Mage)", LogLevel.Info);
+                    }
+                    else
+                    {
+                        SaveData.UnlockedSpellIds.Remove(SpellRegistry.FireballCantrip.Id);
+                        Monitor.Log("Removed FireballCantrip (player doesn't have Battle Mage)", LogLevel.Info);
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Monitor.Log($"Error cleaning up conflicting spells: {ex.Message}", LogLevel.Error);
+            }
+        }
         private void OnDayStarted(object? sender, DayStartedEventArgs e)
         {
             // Run these once after the first UpdateTicked after day start
