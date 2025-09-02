@@ -72,9 +72,17 @@ internal class ManaBar
 
     public void OnRenderingHud(object? sender, StardewModdingAPI.Events.RenderingHudEventArgs e)
     {
-        ModEntry.Instance.Monitor.Log("Drawing mana bar...", LogLevel.Trace);
+        // Don’t draw if a festival, event, or special cutscene is active
+        if (Game1.eventUp || Game1.isFestival())
+            return;
+
+        // Optionally: don’t show if another HUD-blocking menu is open
+        if (Game1.activeClickableMenu != null && Game1.activeClickableMenu is not GameMenu)
+            return;
+
         DrawManaBar(Game1.spriteBatch);
     }
+
 
     public void SubscribeToEvents(IModHelper helper)
     {

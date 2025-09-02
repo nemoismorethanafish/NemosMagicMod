@@ -12,7 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static Spell;
 
-//Pickaxe got stuck hovering on a rock. Need to adjust 
+//Enhanced EarthSpirit with dual pickaxes at Master tier
 
 public class EarthSpirit : Spell, IRenderable
 {
@@ -22,7 +22,6 @@ public class EarthSpirit : Spell, IRenderable
     private Pickaxe pickaxe;
 
     private bool subscribed = false;
-    private Vector2 toolPosition;
     private readonly float moveSpeed = 256f;
 
     private float spellTimer = 0f;
@@ -42,23 +41,40 @@ public class EarthSpirit : Spell, IRenderable
 
     public bool IsActive { get; private set; }
 
-    private Vector2? currentTargetTile = null;
-    private float mineTimer = 0f;
+    // Pickaxe data structure
+    private class PickaxeInstance
+    {
+        public Vector2 Position;
+        public Vector2? CurrentTargetTile;
+        public float MineTimer;
+        public float SwingAngle;
+        public int SwingDirection = 1;
+        public bool IsReturning;
+
+        public PickaxeInstance(Vector2 startPosition)
+        {
+            Position = startPosition;
+            CurrentTargetTile = null;
+            MineTimer = 0f;
+            SwingAngle = 0f;
+            SwingDirection = 1;
+            IsReturning = false;
+        }
+    }
+
+    private List<PickaxeInstance> pickaxes = new List<PickaxeInstance>();
     private readonly float mineInterval = 0.8f;
+    private readonly float swingSpeed = 5f;
+    private readonly float maxSwingAngle = 0.5f;
 
-    private float swingAngle = 0f;
-    private float swingSpeed = 5f;
-    private int swingDirection = 1;
-    private float maxSwingAngle = 0.5f;
-
-    private bool isReturning = false;
     private Farmer owner;
+    private int pickaxeCount = 1; // Will be set based on tier
 
     public EarthSpirit()
         : base(
             "nemo.EarthSpirit",
             "Earth Spirit",
-            "Summons a magical pickaxe that mines rocks. Duration increases with spellbook tier.",
+            "Summons magical pickaxe that mine rocks. Duration increases with spellbook tier.",
             30,
             25,
             false,
@@ -88,6 +104,9 @@ public class EarthSpirit : Spell, IRenderable
         ModEntry.Instance.Helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
         subscribed = false;
 
+        // Clear pickaxes
+        pickaxes.Clear();
+
         // Remove buff when spell ends
         if (owner != null && owner.buffs.IsApplied(BuffId))
         {
@@ -105,6 +124,14 @@ public class EarthSpirit : Spell, IRenderable
         return 20f * multiplier; // Base 20 seconds * tier multiplier
     }
 
+    /// <summary>
+    /// Gets the number of pickaxes to spawn based on tier
+    /// </summary>
+    private int GetPickaxeCount(SpellbookTier tier)
+    {
+        return tier == SpellbookTier.Master ? 2 : 1;
+    }
+
     private void ApplyEarthSpiritBuff(Farmer who, float duration)
     {
         // Remove existing Earth Spirit buff if present
@@ -114,22 +141,21 @@ public class EarthSpirit : Spell, IRenderable
         // Convert spell duration to milliseconds
         int durationMs = (int)(duration * 1000);
 
-        // Debug the texture being used
-        ModEntry.Instance.Monitor.Log($"Applying Earth Spirit buff with texture: {buffIconTexture?.Width}x{buffIconTexture?.Height}", LogLevel.Info);
-
         var currentTier = GetCurrentSpellbookTier(who);
+        var pickaxeCountText = pickaxeCount > 1 ? $"{pickaxeCount} pickaxes" : "a pickaxe";
+
         var buff = new Buff(
             id: BuffId,
             displayName: "Earth Spirit",
-            iconTexture: buffIconTexture, // Use the small 16x16 buff icon
+            iconTexture: buffIconTexture,
             iconSheetIndex: 0,
             duration: durationMs,
             effects: new BuffEffects(), // No stat effects, just visual indicator
-            description: $"A magical pickaxe is mining rocks for you! ({currentTier} tier)"
+            description: $"{pickaxeCountText} mining rocks for you! ({currentTier} tier)"
         );
 
         who.buffs.Apply(buff);
-        ModEntry.Instance.Monitor.Log($"Earth Spirit buff applied for {duration} seconds ({currentTier} tier)", LogLevel.Info);
+        ModEntry.Instance.Monitor.Log($"Earth Spirit buff applied for {duration} seconds ({currentTier} tier, {pickaxeCount} pickaxe(s))", LogLevel.Info);
     }
 
     public override void Cast(Farmer who)
@@ -139,13 +165,15 @@ public class EarthSpirit : Spell, IRenderable
 
         base.Cast(who);
 
-        // Set duration based on current spellbook tier
+        // Set duration and pickaxe count based on current spellbook tier
+        var currentTier = GetCurrentSpellbookTier(who);
         spellDuration = GetTierAdjustedDuration(who);
+        pickaxeCount = GetPickaxeCount(currentTier);
 
         // Show tier-specific message
-        var currentTier = GetCurrentSpellbookTier(who);
         var durationSeconds = (int)spellDuration;
-        Game1.addHUDMessage(new HUDMessage($"Earth Spirit summoned for {durationSeconds}s ({currentTier} tier)", 2));
+        var pickaxeText = pickaxeCount > 1 ? $"{pickaxeCount} Earth Spirits" : "Earth Spirit";
+        Game1.addHUDMessage(new HUDMessage($"{pickaxeText} summoned for {durationSeconds}s ({currentTier} tier)", 2));
 
         // Delay only the EarthSpirit visual/effects
         DelayedAction.functionAfterDelay(() =>
@@ -161,9 +189,18 @@ public class EarthSpirit : Spell, IRenderable
             // Initialize new Earth Spirit state
             IsActive = true;
             spellTimer = 0f;
-            currentTargetTile = null;
-            isReturning = false;
-            toolPosition = who.Position + new Vector2(0, -64f);
+
+            // Create pickaxe instances based on tier
+            pickaxes.Clear();
+            for (int i = 0; i < pickaxeCount; i++)
+            {
+                Vector2 startOffset = pickaxeCount > 1
+                    ? new Vector2((i - 0.5f) * 48f, -64f) // Spread them out for dual pickaxes
+                    : new Vector2(0, -64f); // Single pickaxe centered
+
+                var pickaxeInstance = new PickaxeInstance(who.Position + startOffset);
+                pickaxes.Add(pickaxeInstance);
+            }
 
             // Apply the buff
             ApplyEarthSpiritBuff(who, spellDuration);
@@ -198,85 +235,141 @@ public class EarthSpirit : Spell, IRenderable
             if (owner != null)
             {
                 var currentTier = GetCurrentSpellbookTier(owner);
-                Game1.addHUDMessage(new HUDMessage($"Earth Spirit dismissed ({currentTier} tier)", 1));
+                var pickaxeText = pickaxeCount > 1 ? "Earth Spirits" : "Earth Spirit";
+                Game1.addHUDMessage(new HUDMessage($"{pickaxeText} dismissed ({currentTier} tier)", 1));
             }
             return;
         }
 
-        // Acquire nearest rock if no target
-        if (currentTargetTile == null)
+        // Update each pickaxe
+        for (int i = 0; i < pickaxes.Count; i++)
         {
-            currentTargetTile = FindNearestRock();
-            mineTimer = 0f;
+            UpdatePickaxe(pickaxes[i], deltaSeconds);
+        }
+    }
+
+    private void UpdatePickaxe(PickaxeInstance pickaxe, float deltaSeconds)
+    {
+        // Acquire nearest rock if no target (that's not already being targeted by another pickaxe)
+        if (pickaxe.CurrentTargetTile == null)
+        {
+            pickaxe.CurrentTargetTile = FindNearestRockForPickaxe(pickaxe);
+            pickaxe.MineTimer = 0f;
         }
 
-        if (currentTargetTile != null)
+        if (pickaxe.CurrentTargetTile != null)
         {
-            Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -hoverHeight);
-            Vector2 direction = targetWorld - toolPosition;
+            Vector2 targetWorld = pickaxe.CurrentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -hoverHeight);
+            Vector2 direction = targetWorld - pickaxe.Position;
 
             const float arrivalThreshold = 8f; // pixels
             if (direction.LengthSquared() > arrivalThreshold * arrivalThreshold)
             {
                 direction.Normalize();
-                toolPosition += direction * moveSpeed * deltaSeconds;
+                pickaxe.Position += direction * moveSpeed * deltaSeconds;
             }
             else
             {
-                toolPosition = targetWorld;
-                mineTimer += deltaSeconds;
-                if (mineTimer >= mineInterval)
+                pickaxe.Position = targetWorld;
+                pickaxe.MineTimer += deltaSeconds;
+                if (pickaxe.MineTimer >= mineInterval)
                 {
-                    MineRockAt(currentTargetTile.Value);
-                    mineTimer = 0f;
+                    MineRockAt(pickaxe.CurrentTargetTile.Value);
+                    pickaxe.MineTimer = 0f;
                 }
 
                 // Swing animation
-                swingAngle += swingDirection * swingSpeed * deltaSeconds;
-                if (swingAngle > maxSwingAngle) { swingAngle = maxSwingAngle; swingDirection = -1; }
-                if (swingAngle < -maxSwingAngle) { swingAngle = -maxSwingAngle; swingDirection = 1; }
-
-                if (!Game1.currentLocation.objects.ContainsKey(currentTargetTile.Value))
+                pickaxe.SwingAngle += pickaxe.SwingDirection * swingSpeed * deltaSeconds;
+                if (pickaxe.SwingAngle > maxSwingAngle)
                 {
-                    currentTargetTile = null;
-                    swingAngle = 0f;
+                    pickaxe.SwingAngle = maxSwingAngle;
+                    pickaxe.SwingDirection = -1;
+                }
+                if (pickaxe.SwingAngle < -maxSwingAngle)
+                {
+                    pickaxe.SwingAngle = -maxSwingAngle;
+                    pickaxe.SwingDirection = 1;
+                }
+
+                if (!Game1.currentLocation.objects.ContainsKey(pickaxe.CurrentTargetTile.Value))
+                {
+                    pickaxe.CurrentTargetTile = null;
+                    pickaxe.SwingAngle = 0f;
                 }
             }
 
-            isReturning = false;
+            pickaxe.IsReturning = false;
         }
         else
         {
-            isReturning = true;
+            pickaxe.IsReturning = true;
         }
 
         // Return to player if no target
-        if (isReturning && owner != null)
+        if (pickaxe.IsReturning && owner != null)
         {
-            Vector2 direction = owner.Position - toolPosition;
+            // Determine target position based on pickaxe index
+            int pickaxeIndex = pickaxes.IndexOf(pickaxe);
+            Vector2 targetPosition;
+
+            if (pickaxeCount > 1)
+            {
+                // For dual pickaxes, mirror positions
+                Vector2 baseOffset = new Vector2(0, -72f); // Original follow position
+                if (pickaxeIndex == 0)
+                {
+                    // First pickaxe stays in original position
+                    targetPosition = owner.Position + baseOffset;
+                }
+                else
+                {
+                    // Second pickaxe mirrors to the opposite side
+                    Vector2 mirroredOffset = new Vector2(-baseOffset.X, baseOffset.Y); // Mirror X, keep Y
+                    // Add some horizontal separation so they don't overlap
+                    mirroredOffset.X += 72f; // Move to the right side
+                    targetPosition = owner.Position + mirroredOffset;
+                }
+            }
+            else
+            {
+                // Single pickaxe hovers above player
+                targetPosition = owner.Position + new Vector2(0, -72f);
+            }
+
+            Vector2 direction = targetPosition - pickaxe.Position;
             if (direction.LengthSquared() > 4f)
             {
                 direction.Normalize();
-                toolPosition += direction * moveSpeed * deltaSeconds;
+                pickaxe.Position += direction * moveSpeed * deltaSeconds;
             }
         }
     }
 
-    private Vector2? FindNearestRock()
+    private Vector2? FindNearestRockForPickaxe(PickaxeInstance requestingPickaxe)
     {
         if (Game1.currentLocation == null) return null;
 
-        Vector2 toolTile = new((int)Math.Floor(toolPosition.X / Game1.tileSize),
-                               (int)Math.Floor(toolPosition.Y / Game1.tileSize));
+        Vector2 pickaxeTile = new((int)Math.Floor(requestingPickaxe.Position.X / Game1.tileSize),
+                                  (int)Math.Floor(requestingPickaxe.Position.Y / Game1.tileSize));
 
         double closestDist = double.MaxValue;
         Vector2? closestTile = null;
 
+        // Get list of tiles already being targeted by other pickaxes
+        var targetedTiles = new HashSet<Vector2>();
+        foreach (var otherPickaxe in pickaxes)
+        {
+            if (otherPickaxe != requestingPickaxe && otherPickaxe.CurrentTargetTile.HasValue)
+            {
+                targetedTiles.Add(otherPickaxe.CurrentTargetTile.Value);
+            }
+        }
+
         foreach (var pair in Game1.currentLocation.objects.Pairs)
         {
-            if (IsMineableRock(pair.Value))
+            if (IsMineableRock(pair.Value) && !targetedTiles.Contains(pair.Key))
             {
-                double dist = Vector2.DistanceSquared(pair.Key, toolTile);
+                double dist = Vector2.DistanceSquared(pair.Key, pickaxeTile);
                 if (dist < closestDist)
                 {
                     closestDist = dist;
@@ -298,6 +391,13 @@ public class EarthSpirit : Spell, IRenderable
         try
         {
             float oldStamina = owner.stamina;
+
+            // Create a pickaxe instance if we don't have one
+            if (pickaxe == null)
+            {
+                pickaxe = new Pickaxe();
+                pickaxe.UpgradeLevel = 4; // Set to max level (Iridium)
+            }
 
             // Use the pickaxe's DoFunction like a normal tool swing
             pickaxe.DoFunction(Game1.currentLocation, (int)tile.X * Game1.tileSize, (int)tile.Y * Game1.tileSize, 1, owner);
@@ -324,18 +424,23 @@ public class EarthSpirit : Spell, IRenderable
         if (!IsActive) return;
 
         SpriteBatch spriteBatch = e.SpriteBatch;
-        Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, toolPosition);
 
-        spriteBatch.Draw(
-            pickaxeTexture,
-            screenPos,
-            null,
-            Color.White,
-            swingAngle,
-            new Vector2(pickaxeTexture.Width / 2, pickaxeTexture.Height / 2),
-            2f,
-            SpriteEffects.None,
-            1f
-        );
+        // Render each pickaxe
+        foreach (var pickaxe in pickaxes)
+        {
+            Vector2 screenPos = Game1.GlobalToLocal(Game1.viewport, pickaxe.Position);
+
+            spriteBatch.Draw(
+                pickaxeTexture,
+                screenPos,
+                null,
+                Color.White,
+                pickaxe.SwingAngle,
+                new Vector2(pickaxeTexture.Width / 2, pickaxeTexture.Height / 2),
+                2f,
+                SpriteEffects.None,
+                0.001f
+            );
+        }
     }
 }
