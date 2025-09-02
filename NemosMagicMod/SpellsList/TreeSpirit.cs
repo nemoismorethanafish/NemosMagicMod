@@ -11,7 +11,7 @@ using StardewValley.Tools;
 using System;
 using static Spell;
 
-//Currently spawning sprites at the farmer when the axe hits a tree
+//Fixed: Particles now spawn at tree location or not at all
 
 public class TreeSpirit : Spell, IRenderable
 {
@@ -46,7 +46,7 @@ public class TreeSpirit : Spell, IRenderable
         : base("spirit_tree", "Tree Spirit",
               "Summons a magical axe that chops trees.",
               30, 25, false,
-              "assets/TreeSpiritAxe.png") // <-- fixed constructor
+              "assets/TreeSpiritAxe.png")
     {
         axeTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritAxe.png");
         buffIconTexture = ModEntry.Instance.Helper.ModContent.Load<Texture2D>("assets/TreeSpiritBuffIcon.png");
@@ -112,10 +112,10 @@ public class TreeSpirit : Spell, IRenderable
         var buff = new Buff(
             id: BuffId,
             displayName: "Tree Spirit",
-            iconTexture: buffIconTexture, // Use the same texture as the spell icon
+            iconTexture: buffIconTexture,
             iconSheetIndex: 0,
             duration: durationMs,
-            effects: new BuffEffects(), // No stat effects, just visual indicator
+            effects: new BuffEffects(),
             description: "A magical axe is chopping trees for you!"
         );
 
@@ -155,14 +155,13 @@ public class TreeSpirit : Spell, IRenderable
             chopTimer = 0f;
 
             if (currentTargetTile == null)
-                isReturning = true; // start returning to player
+                isReturning = true;
             else
                 isReturning = false;
         }
 
         if (currentTargetTile != null)
         {
-            // move toward tree and chop (existing logic)
             Vector2 targetWorld = currentTargetTile.Value * Game1.tileSize + new Vector2(Game1.tileSize / 2, -32f);
             Vector2 direction = targetWorld - axePosition;
 
@@ -180,7 +179,7 @@ public class TreeSpirit : Spell, IRenderable
                     chopTimer = 0f;
                 }
 
-                // swing animation (existing logic)
+                // swing animation
                 swingAngle += swingDirection * swingSpeed * deltaSeconds;
                 if (swingAngle > maxSwingAngle) { swingAngle = maxSwingAngle; swingDirection = -1; }
                 if (swingAngle < -maxSwingAngle) { swingAngle = -maxSwingAngle; swingDirection = 1; }
@@ -205,7 +204,6 @@ public class TreeSpirit : Spell, IRenderable
             }
             else
             {
-                // Close enough to player, stop returning
                 isReturning = false;
             }
         }
@@ -239,13 +237,21 @@ public class TreeSpirit : Spell, IRenderable
     {
         if (owner == null) return;
 
-        Axe axe = new();
-        Vector2 pixelPos = tile * Game1.tileSize + new Vector2(Game1.tileSize / 2, Game1.tileSize / 2);
+        // SOLUTION 1: Temporarily move farmer to tree location for particle spawning
+        Vector2 originalPosition = owner.Position;
+        Vector2 treeWorldPos = tile * Game1.tileSize + new Vector2(Game1.tileSize / 2, Game1.tileSize / 2);
 
-        // Save stamina before swinging
+        // Move farmer to tree temporarily (particles will spawn here)
+        owner.Position = treeWorldPos;
+
+        Axe axe = new();
         float oldStamina = owner.stamina;
-        axe.DoFunction(Game1.currentLocation, (int)pixelPos.X, (int)pixelPos.Y, 1, owner);
-        owner.stamina = oldStamina; // Restore stamina to prevent drain
+
+        axe.DoFunction(Game1.currentLocation, (int)treeWorldPos.X, (int)treeWorldPos.Y, 1, owner);
+
+        // Restore farmer position and stamina
+        owner.Position = originalPosition;
+        owner.stamina = oldStamina;
     }
 
     private void OnRenderedWorld(object? sender, RenderedWorldEventArgs e)
