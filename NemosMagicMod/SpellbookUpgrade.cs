@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using SpaceCore;
 
 namespace NemosMagicMod.Spells
 {
@@ -27,10 +28,13 @@ namespace NemosMagicMod.Spells
         public static readonly int[] GoldCostPerTier = { 2000, 5000, 20000 };
         public static readonly (string name, int count)[][] MaterialCostPerTier =
         {
-    new[] { ("Frozen Tear", 1), ("Fire Quartz", 1) },       // Apprentice
-    new[] { ("Void Essence", 5), ("Solar Essence", 5) },   // Adept
-    new[] { ("Prismatic Shard", 1), ("Dragon Tooth", 5) }  // Master
-};
+            new[] { ("Frozen Tear", 1), ("Fire Quartz", 1) },       // Apprentice
+            new[] { ("Void Essence", 5), ("Solar Essence", 5) },   // Adept
+            new[] { ("Prismatic Shard", 1), ("Dragon Tooth", 5) }  // Master
+        };
+
+        // Experience rewards per tier upgrade
+        public static readonly int[] ExperienceRewardPerTier = { 100, 500, 1000 }; // Apprentice, Adept, Master
 
         // Remove items from inventory
         public static void RemoveItemsFromInventory(Farmer player, string itemName, int count)
@@ -55,6 +59,21 @@ namespace NemosMagicMod.Spells
             }
         }
 
+        // Grant Magic skill experience
+        public static void GrantMagicExperience(int amount, IMonitor monitor = null)
+        {
+            try
+            {
+                // Using SpaceCore's Skills system to add experience
+                Skills.AddExperience(Game1.player, "nemosmagicmod.Magic", amount);
+                monitor?.Log($"Granted {amount} Magic experience from spellbook study", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                monitor?.Log($"Error granting Magic experience: {ex.Message}", LogLevel.Error);
+            }
+        }
+
         // --- Upgrade Menu ---
         public class SpellbookUpgradeMenu : IClickableMenu
         {
@@ -63,6 +82,7 @@ namespace NemosMagicMod.Spells
 
             private readonly List<(string name, int count)> requiredMaterials;
             private readonly int goldCost;
+            private readonly int experienceReward;
 
             private readonly ClickableComponent upgradeButton;
             private readonly ClickableComponent cancelButton;
@@ -86,6 +106,7 @@ namespace NemosMagicMod.Spells
 
                 goldCost = GoldCostPerTier[nextTierIndex];
                 requiredMaterials = MaterialCostPerTier[nextTierIndex].ToList();
+                experienceReward = ExperienceRewardPerTier[nextTierIndex];
 
                 int buttonWidth = 220;
                 int buttonHeight = 70;
@@ -148,21 +169,29 @@ namespace NemosMagicMod.Spells
                     yPositionOnScreen + padding + 40
                 );
 
+                // Experience reward
+                SpriteText.drawString(
+                    b,
+                    $"Magic XP: +{experienceReward}",
+                    xPositionOnScreen + padding,
+                    yPositionOnScreen + padding + 80
+                );
+
                 // Draw required materials
                 var itemIndices = new Dictionary<string, int>()
-        {
-            { "Frozen Tear", 84 },
-            { "Fire Quartz", 82 },
-            { "Void Essence", 769 },
-            { "Solar Essence", 768 },
-            { "Prismatic Shard", 74 },
-            { "Dragon Tooth", 852 },
-            { "Iridium Bar", 337 }
-        };
+                {
+                    { "Frozen Tear", 84 },
+                    { "Fire Quartz", 82 },
+                    { "Void Essence", 769 },
+                    { "Solar Essence", 768 },
+                    { "Prismatic Shard", 74 },
+                    { "Dragon Tooth", 852 },
+                    { "Iridium Bar", 337 }
+                };
 
                 int tileSize = 16;
                 int scale = 4;
-                int offsetY = yPositionOnScreen + padding + 120;
+                int offsetY = yPositionOnScreen + padding + 160; // Adjusted for XP display
 
                 foreach (var (name, count) in requiredMaterials)
                 {
@@ -245,7 +274,7 @@ namespace NemosMagicMod.Spells
                 if (upgradeButton.containsPoint(Game1.getOldMouseX(), Game1.getOldMouseY()))
                 {
                     string tooltip = CanStudy
-                        ? "Studying this spellbook will advance it to the next tier. It will take 6 hours."
+                        ? $"Studying this spellbook will advance it to the next tier and grant {experienceReward} Magic XP. It will take 6 hours."
                         : "Cannot study after 6 PM.";
 
                     // Use the same hover text method as SpellSelectionMenu
@@ -255,8 +284,6 @@ namespace NemosMagicMod.Spells
                         Game1.smallFont
                     );
                 }
-
-
 
                 base.draw(b);
                 Game1.mouseCursorTransparency = 1f;
@@ -307,8 +334,11 @@ namespace NemosMagicMod.Spells
                 spellbook.Tier++;
                 spellbook.UpdateTierAppearance();
 
-                Game1.showGlobalMessage($"Your Spellbook has been upgraded to {spellbook.Tier}!");
-                monitor.Log($"Spellbook upgraded to {spellbook.Tier}", LogLevel.Info);
+                // Grant Magic experience
+                GrantMagicExperience(experienceReward, monitor);
+
+                Game1.showGlobalMessage($"Your Spellbook has been upgraded to {spellbook.Tier}! (+{experienceReward} Magic XP)");
+                monitor.Log($"Spellbook upgraded to {spellbook.Tier}, granted {experienceReward} Magic XP", LogLevel.Info);
 
                 // Advance time by 6 hours
                 Game1.timeOfDay += 600;
@@ -318,5 +348,4 @@ namespace NemosMagicMod.Spells
             }
         }
     }
-
 }

@@ -4,6 +4,7 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using System.Linq;
+using System.Collections.Generic;
 using static SpaceCore.Skills;
 
 namespace NemosMagicMod
@@ -12,28 +13,47 @@ namespace NemosMagicMod
     {
         private readonly IMonitor Monitor;
         private readonly IModHelper Helper;
-        private bool checkedUnlockLevel1 = false;
-        private bool checkedUnlockLevel2 = false;
-        private bool checkedUnlockLevel3 = false;
-        private bool checkedUnlockLevel4 = false;
-        private bool checkedUnlockLevel6 = false;
-        private bool checkedUnlockLevel7 = false;
-        private bool checkedUnlockLevel9 = false;
+        private int lastCheckedLevel = 0;
+        private HashSet<string> pendingSpellUnlocks = new HashSet<string>();
 
         public LevelUpChanges(IModHelper helper, IMonitor monitor)
         {
             Helper = helper;
             Monitor = monitor;
 
-            // Wait until the world is ready and magic level is stable
+            // Subscribe to level-up events
+            helper.Events.Player.LevelChanged += OnLevelChanged;
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
+        }
+
+        private void OnLevelChanged(object? sender, LevelChangedEventArgs e)
+        {
+            // Check if Magic skill leveled up
+            if (e.Skill.ToString() == "nemosmagicmod.Magic")
+            {
+                // Queue spell unlocks for this level
+                var spellsToUnlock = GetSpellsForLevel(e.NewLevel);
+                foreach (var spell in spellsToUnlock)
+                {
+                    pendingSpellUnlocks.Add(spell.Id);
+                }
+
+                Monitor.Log($"Magic skill leveled up to {e.NewLevel}! Queued {spellsToUnlock.Count} spells for unlock.", LogLevel.Info);
+            }
         }
 
         private int GetProfessionId(string skill, string profession)
         {
-            return Skills.GetSkill(skill).Professions
-                         .Single(p => p.Id == profession)
-                         .GetVanillaId();
+            try
+            {
+                return Skills.GetSkill(skill).Professions
+                             .Single(p => p.Id == profession)
+                             .GetVanillaId();
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
         private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -41,131 +61,108 @@ namespace NemosMagicMod
             if (!Context.IsWorldReady)
                 return;
 
-            if (ModEntry.MagicLevel >= 1 && !checkedUnlockLevel1)
+            // Process any pending spell unlocks
+            if (pendingSpellUnlocks.Count > 0)
             {
-                try
+                foreach (var spellId in pendingSpellUnlocks.ToList())
+                {
+                    if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spellId))
+                    {
+                        SpellRegistry.PlayerData.UnlockedSpellIds.Add(spellId);
+                        Monitor.Log($"Spell with ID {spellId} unlocked!", LogLevel.Info);
+                    }
+                    pendingSpellUnlocks.Remove(spellId);
+                }
+            }
+
+            // Check for level changes and unlock spells accordingly
+            if (ModEntry.MagicLevel > lastCheckedLevel)
+            {
+                for (int level = lastCheckedLevel + 1; level <= ModEntry.MagicLevel; level++)
+                {
+                    UnlockSpellsForLevel(level);
+                }
+                lastCheckedLevel = ModEntry.MagicLevel;
+            }
+        }
+
+        private void UnlockSpellsForLevel(int level)
+        {
+            var spells = GetSpellsForLevel(level);
+
+            foreach (var spell in spells)
+            {
+                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
+                {
+                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
+                    Monitor.Log($"{spell.Name} spell unlocked at Magic Level {level}!", LogLevel.Info);
+                }
+            }
+        }
+
+        private List<Spell> GetSpellsForLevel(int level)
+        {
+            var spells = new List<Spell>();
+
+            try
+            {
+                // Level 1 - Fireball (depends on profession)
+                if (level == 1)
                 {
                     int battleMageID = GetProfessionId(ModEntry.SkillID, "BattleMage");
                     bool hasBattleMage = battleMageID != -1 && Game1.player.professions.Contains(battleMageID);
 
-                    if (!hasBattleMage)
+                    if (hasBattleMage)
                     {
-                        // Unlock regular Fireball
-                        var spell = SpellRegistry.Fireball;
-                        if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                        {
-                            SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                            Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                        }
-
-                        // Make sure FireballCantrip is NOT unlocked
-                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.FireballCantrip.Id);
+                        spells.Add(SpellRegistry.FireballCantrip);
+                        // Remove regular Fireball if it was unlocked
+                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
                     }
                     else
                     {
-                        // Player has Battle Mage - ensure only FireballCantrip is unlocked
-                        var cantripSpell = SpellRegistry.FireballCantrip;
-                        if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(cantripSpell.Id))
-                        {
-                            SpellRegistry.PlayerData.UnlockedSpellIds.Add(cantripSpell.Id);
-                            Monitor.Log($"{cantripSpell.Name} spell unlocked via Battle Mage profession!", LogLevel.Info);
-                        }
-
-                        // Make sure regular Fireball is NOT unlocked
-                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.Fireball.Id);
+                        spells.Add(SpellRegistry.Fireball);
+                        // Remove FireballCantrip if it was unlocked
+                        SpellRegistry.PlayerData.UnlockedSpellIds.Remove(SpellRegistry.FireballCantrip.Id);
                     }
                 }
-                catch (System.Exception ex)
+                // Level 2 - Heal
+                else if (level == 2)
                 {
-                    Monitor.Log($"Error in level 1 spell unlock: {ex.Message}", LogLevel.Error);
+                    spells.Add(SpellRegistry.Heal);
                 }
-
-                checkedUnlockLevel1 = true;
+                // Level 3 - TreeSpirit and EarthSpirit
+                else if (level == 3)
+                {
+                    spells.Add(SpellRegistry.TreeSpirit);
+                    spells.Add(SpellRegistry.EarthSpirit);
+                }
+                // Level 4 - SeaSpirit
+                else if (level == 4)
+                {
+                    spells.Add(SpellRegistry.SeaSpirit);
+                }
+                // Level 6 - HomeWarp
+                else if (level == 6)
+                {
+                    spells.Add(SpellRegistry.HomeWarp);
+                }
+                // Level 7 - TimeWarp
+                else if (level == 7)
+                {
+                    spells.Add(SpellRegistry.TimeWarp);
+                }
+                // Level 9 - FertilitySpirit
+                else if (level == 9)
+                {
+                    spells.Add(SpellRegistry.FertilitySpirit);
+                }
             }
-            if (ModEntry.MagicLevel >= 2 && !checkedUnlockLevel2)
+            catch (System.Exception ex)
             {
-                var spell = SpellRegistry.Heal;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel2 = true;
+                Monitor.Log($"Error getting spells for level {level}: {ex.Message}", LogLevel.Error);
             }
 
-            if (ModEntry.MagicLevel >= 3 && !checkedUnlockLevel3)
-            {
-                var spell = SpellRegistry.TreeSpirit;
-                var spell2 = SpellRegistry.EarthSpirit;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell2.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell2.Id);
-                    Monitor.Log($"{spell2.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel3 = true;
-            }
-
-            if (ModEntry.MagicLevel >= 4 && !checkedUnlockLevel4)
-            {
-                var spell = SpellRegistry.SeaSpirit;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel4 = true;
-            }
-
-            if (ModEntry.MagicLevel >= 6 && !checkedUnlockLevel6)
-            {
-                var spell = SpellRegistry.HomeWarp;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel6 = true;
-            }
-
-            if (ModEntry.MagicLevel >= 7 && !checkedUnlockLevel7)
-            {
-                var spell = SpellRegistry.TimeWarp;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel7 = true;
-            }
-
-            if (ModEntry.MagicLevel >= 9 && !checkedUnlockLevel9)
-            {
-                var spell = SpellRegistry.FertilitySpirit;
-
-                if (!SpellRegistry.PlayerData.UnlockedSpellIds.Contains(spell.Id))
-                {
-                    SpellRegistry.PlayerData.UnlockedSpellIds.Add(spell.Id);
-                    Monitor.Log($"{spell.Name} spell unlocked at MagicLevel {ModEntry.MagicLevel}!", LogLevel.Info);
-                }
-
-                checkedUnlockLevel9 = true;
-            }
+            return spells;
         }
     }
 }
