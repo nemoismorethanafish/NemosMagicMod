@@ -37,9 +37,9 @@ namespace NemosMagicMod.Spells
         private readonly Dictionary<SpellbookTier, int> bubbleLocationCounts = new()
         {
             { SpellbookTier.Novice, 1 },
-            { SpellbookTier.Apprentice, 2 },
-            { SpellbookTier.Adept, 3 },
-            { SpellbookTier.Master, 4 }
+            { SpellbookTier.Apprentice, 3 },
+            { SpellbookTier.Adept, 6 },
+            { SpellbookTier.Master, 9 }
         };
 
         private Texture2D bubbleTexture;
@@ -53,12 +53,21 @@ namespace NemosMagicMod.Spells
         // Override minimum tier requirement
         protected override SpellbookTier MinimumTier => SpellbookTier.Apprentice;
 
-        private void ApplySeaSpiritBuff(Farmer who, float duration)
+        // Extra fishing luck multiplier at Master tier
+        private readonly Dictionary<SpellbookTier, double> fishingLuckMultipliers = new()
+{
+    { SpellbookTier.Novice, 1.0 },
+    { SpellbookTier.Apprentice, 1.0 },
+    { SpellbookTier.Adept, 1.0 },
+    { SpellbookTier.Master, 1.5 } // 50% better luck near bubbles
+};
+
+        private void ApplySeaSpiritBuff(Farmer who)
         {
             if (who.buffs.IsApplied(BuffId))
                 who.buffs.Remove(BuffId);
 
-            int durationMs = (int)(duration * 1000);
+            int durationMs = (int)(bubbleTimer * 1000);
             var tier = GetCurrentSpellbookTier(who);
 
             var buff = new Buff(
@@ -72,7 +81,7 @@ namespace NemosMagicMod.Spells
             );
 
             who.buffs.Apply(buff);
-            ModEntry.Instance.Monitor.Log($"Sea Spirit buff applied for {duration}s ({tier} tier)", LogLevel.Info);
+            ModEntry.Instance.Monitor.Log($"Sea Spirit buff applied for {bubbleTimer:F1}s ({tier} tier)", LogLevel.Info);
         }
 
         private void ApplyBuffRemoval(Farmer who)
@@ -81,7 +90,12 @@ namespace NemosMagicMod.Spells
                 who.buffs.Remove(BuffId);
 
             Unsubscribe();
+
+            // Reset bubbles
+            bubbles.Clear();
+            bubbleTimer = 0f;
         }
+
 
 
 
@@ -100,9 +114,9 @@ namespace NemosMagicMod.Spells
                 buffIconTexture = bubbleTexture;
             }
 
-            ApplyHarmonyPatches();
+            // Only apply patches once using a static flag
+            ApplyHarmonyPatchesOnce();
         }
-
         public bool IsActive => bubbleTimer > 0f;
         protected override bool FreezePlayerDuringCast => false;
 
@@ -114,38 +128,48 @@ namespace NemosMagicMod.Spells
             public float XOffset;
             public float RiseSpeed;
             public float DriftSpeed;
-            public float StartDelay;
-            public bool Active;
             public float Scale;
             public float ScaleDirection;
 
             public Bubble(Vector2 tile)
             {
                 Tile = tile;
-                XOffset = Game1.random.Next(-4, 5);
-                PixelPos = tile * Game1.tileSize + new Vector2(XOffset, 0);
-                Opacity = 0f;
+                InitializeValues();
+            }
 
-                RiseSpeed = BubbleRiseSpeed * (0.8f + (float)Game1.random.NextDouble() * 0.4f);
+            private void InitializeValues()
+            {
+                // Fully random initial values
+                XOffset = Game1.random.Next(-4, 5);
+                PixelPos = Tile * Game1.tileSize + new Vector2(XOffset, 0);
+                Opacity = 1f;
+                RiseSpeed = SeaSpirit.BubbleRiseSpeed * (0.8f + (float)Game1.random.NextDouble() * 0.4f);
                 DriftSpeed = ((float)Game1.random.NextDouble() - 0.5f) * 20f;
-                StartDelay = (float)Game1.random.NextDouble() * 1f;
-                Active = false;
                 Scale = 0.8f + (float)Game1.random.NextDouble() * 0.4f;
                 ScaleDirection = 1f;
             }
 
-            public void ResetToFreshValues()
+            public void ResetToFreshValues(bool keepRiseSpeed = true)
             {
+                // Store the original rise speed before resetting anything
+                float preservedRiseSpeed = RiseSpeed;
+
                 XOffset = Game1.random.Next(-4, 5);
                 PixelPos = Tile * Game1.tileSize + new Vector2(XOffset, 0);
                 Opacity = 1f;
-                Active = false;
-                StartDelay = (float)Game1.random.NextDouble() * 1f;
-
-                RiseSpeed = BubbleRiseSpeed * (0.8f + (float)Game1.random.NextDouble() * 0.4f);
                 DriftSpeed = ((float)Game1.random.NextDouble() - 0.5f) * 20f;
                 Scale = 0.8f + (float)Game1.random.NextDouble() * 0.4f;
                 ScaleDirection = 1f;
+
+                // Only regenerate RiseSpeed if we're not keeping it
+                if (keepRiseSpeed)
+                {
+                    RiseSpeed = preservedRiseSpeed;
+                }
+                else
+                {
+                    RiseSpeed = SeaSpirit.BubbleRiseSpeed * (0.8f + (float)Game1.random.NextDouble() * 0.4f);
+                }
             }
         }
 
@@ -167,82 +191,238 @@ namespace NemosMagicMod.Spells
             if (!CanCast(who))
                 return;
 
+            int preCastDirection = who.FacingDirection; // capture before base.Cast
             base.Cast(who);
 
-            ApplySeaSpiritBuff(who, currentSpellDuration);
+            // ✅ remove any existing SeaSpirit instances
+            var existingSeaSpirits = ModEntry.ActiveSpells.OfType<SeaSpirit>().ToList();
+            foreach (var existingSpirit in existingSeaSpirits)
+            {
+                existingSpirit.Unsubscribe();
+                SpellRegistry.UnregisterActiveSpell(existingSpirit);
+            }
 
-            var existingSeaSpirit = ModEntry.ActiveSpells.OfType<SeaSpirit>().FirstOrDefault();
+            // remove old buff if any
+            if (who.buffs.IsApplied(BuffId))
+                who.buffs.Remove(BuffId);
+
+            // setup spell state
             var currentTier = GetCurrentSpellbookTier(who);
-            var extraBubbleCount = GetTierAdjustedBubbleLocations(who);
-            var extraDuration = GetTierAdjustedDuration(who);
+            int bubbleCount = GetTierAdjustedBubbleLocations(who);
+            float duration = GetTierAdjustedDuration(who);
 
-            if (existingSeaSpirit != null)
-            {
-                existingSeaSpirit.AddBubbleLocations(who, currentTier, extraBubbleCount);
-                existingSeaSpirit.ExtendDuration(extraDuration);
+            // ✅ reset duration if already active
+            currentSpellDuration = duration;
+            bubbleTimer = currentSpellDuration;
 
-                Game1.addHUDMessage(new HUDMessage(
-                    $"Sea Spirit refreshed: +{extraBubbleCount} bubbles, +{(int)extraDuration}s duration!", 2));
-            }
-            else
-            {
-                currentSpellDuration = extraDuration;
-                bubbleTimer = currentSpellDuration;
+            string message = existingSeaSpirits.Any()
+                ? $"Sea Spirit recast: {(int)currentSpellDuration}s, {bubbleCount} location(s) ({currentTier} tier)"
+                : $"Sea Spirit: {(int)currentSpellDuration}s, {bubbleCount} location(s) ({currentTier} tier)";
 
-                var durationSeconds = (int)currentSpellDuration;
-                Game1.addHUDMessage(new HUDMessage(
-                    $"Sea Spirit: {durationSeconds}s, {extraBubbleCount} location(s) ({currentTier} tier)", 2));
+            Game1.addHUDMessage(new HUDMessage(message, 2));
 
-                ModEntry.RegisterActiveSpell(this);
-                StartSpellEffects(who, currentTier, extraBubbleCount);
-            }
+            // register new instance
+            ModEntry.RegisterActiveSpell(this);
+
+            // apply buff
+            ApplySeaSpiritBuff(who);
+
+            // spawn bubbles
+            StartSpellEffects(who, currentTier, bubbleCount, preCastDirection);
         }
-
         public void AddBubbleLocations(Farmer who, SpellbookTier tier, int count)
         {
-            var newTiles = PickBubbleTiles(who, count);
+            int facingDirection = who.FacingDirection; // capture it
+
+            var newTiles = PickBubbleTiles(who, count, facingDirection);
+
             foreach (var tile in newTiles)
-                SpawnBubble(tile);
+            {
+                if (!bubbles.Any(b => b.Tile == tile))
+                    SpawnBubble(tile);
+            }
         }
 
-        public void ExtendDuration(float extraSeconds)
-        {
-            bubbleTimer += extraSeconds;
-            currentSpellDuration += extraSeconds;
-        }
-
-        private List<Vector2> PickBubbleTiles(Farmer who, int count)
+        private List<Vector2> PickBubbleTiles(Farmer who, int count, int facingDirection)
         {
             var results = new List<Vector2>();
             var location = who.currentLocation;
             Vector2 center = who.Tile;
+            var currentTier = GetCurrentSpellbookTier(who);
+
+            // Tier-based distance preferences within the 6x6 front area
+            var tierSettings = new Dictionary<SpellbookTier, (int minDistance, float farBias)>
+    {
+        { SpellbookTier.Novice, (0, 0.0f) },      // No minimum distance, no bias
+        { SpellbookTier.Apprentice, (1, 0.3f) },  // 1+ tiles away, mild far bias
+        { SpellbookTier.Adept, (2, 0.6f) },       // 2+ tiles away, stronger far bias  
+        { SpellbookTier.Master, (3, 0.8f) }       // 3+ tiles away, strong far bias
+    };
+
+            var (minDistance, farBias) = tierSettings[currentTier];
+
+            var candidateTiles = GetFrontArea(who, 6, facingDirection);
 
             int tries = 0;
-            while (results.Count < count && tries < 100)
+            int maxTries = Math.Min(candidateTiles.Count * 10, 500);
+
+            while (results.Count < count && tries < maxTries)
             {
                 tries++;
-                int dx = Game1.random.Next(-BubbleRadius, BubbleRadius + 1);
-                int dy = Game1.random.Next(-BubbleRadius, BubbleRadius + 1);
-                Vector2 tile = center + new Vector2(dx, dy);
 
-                if (location.isOpenWater(tile) && !results.Contains(tile))
+                // Pick a random tile from the front area
+                Vector2 tile = candidateTiles[Game1.random.Next(candidateTiles.Count)];
+
+                // Skip if already selected or not water
+                if (results.Contains(tile) || !location.isOpenWater(tile))
+                    continue;
+
+                float distance = Vector2.Distance(center, tile);
+
+                // Enforce minimum distance for higher tiers
+                if (distance < minDistance)
+                    continue;
+
+                // Apply distance-based selection bias within the front area
+                float selectionChance = 1.0f;
+
+                if (farBias > 0f)
+                {
+                    // Calculate distance-based probability (max distance in 6x6 area is ~4.24)
+                    float maxPossibleDistance = 4.24f; // Approximate diagonal of 6x6 area
+                    float normalizedDistance = Math.Min(distance / maxPossibleDistance, 1f);
+
+                    // Higher tier = higher chance to select tiles that are further away
+                    selectionChance = (1f - farBias) + (farBias * normalizedDistance);
+                }
+
+                bool shouldSelect = Game1.random.NextDouble() < selectionChance;
+
+                if (shouldSelect)
                     results.Add(tile);
             }
+
+            // Fallback: if we still don't have enough bubbles, fill with any valid water tiles from front area
+            if (results.Count < count)
+            {
+                foreach (var tile in candidateTiles.OrderBy(x => Game1.random.Next()))
+                {
+                    if (results.Count >= count) break;
+                    if (!results.Contains(tile) && location.isOpenWater(tile))
+                        results.Add(tile);
+                }
+            }
+
+            // Final fallback to prevent empty results
+            if (results.Count == 0)
+                results.Add(center);
+
+            ModEntry.Instance.Monitor.Log(
+                $"Picked {results.Count}/{count} bubble tiles for {currentTier} tier " +
+                $"from 6x6 front area (min distance: {minDistance}, bias: {farBias:P0}) " +
+                $"facing: {DirectionName(facingDirection)}",
+                LogLevel.Debug
+            );
+
 
             return results;
         }
 
+        private List<Vector2> GetFrontArea(Farmer who, int size, int facingDirection)
+        {
+            var tiles = new List<Vector2>();
+            Vector2 center = who.Tile;
+
+            // how far forward and sideways the grid should extend
+            int halfWidth = size / 2;
+
+            ModEntry.Instance.Monitor.Log(
+                $"DEBUG GetFrontArea: Farmer at {center}, UsingDirection={facingDirection} ({DirectionName(facingDirection)})",
+                LogLevel.Info
+            );
+
+            switch (facingDirection)
+            {
+                case 0: // Up
+                    for (int forward = 1; forward <= size; forward++)
+                    {
+                        for (int sideways = -halfWidth; sideways <= halfWidth; sideways++)
+                        {
+                            tiles.Add(new Vector2(center.X + sideways, center.Y - forward));
+                        }
+                    }
+                    ModEntry.Instance.Monitor.Log("Using UP 6x6 grid", LogLevel.Info);
+                    break;
+
+                case 1: // Right
+                    for (int forward = 1; forward <= size; forward++)
+                    {
+                        for (int sideways = -halfWidth; sideways <= halfWidth; sideways++)
+                        {
+                            tiles.Add(new Vector2(center.X + forward, center.Y + sideways));
+                        }
+                    }
+                    ModEntry.Instance.Monitor.Log("Using RIGHT 6x6 grid", LogLevel.Info);
+                    break;
+
+                case 2: // Down
+                    for (int forward = 1; forward <= size; forward++)
+                    {
+                        for (int sideways = -halfWidth; sideways <= halfWidth; sideways++)
+                        {
+                            tiles.Add(new Vector2(center.X + sideways, center.Y + forward));
+                        }
+                    }
+                    ModEntry.Instance.Monitor.Log("Using DOWN 6x6 grid", LogLevel.Info);
+                    break;
+
+                case 3: // Left
+                    for (int forward = 1; forward <= size; forward++)
+                    {
+                        for (int sideways = -halfWidth; sideways <= halfWidth; sideways++)
+                        {
+                            tiles.Add(new Vector2(center.X - forward, center.Y + sideways));
+                        }
+                    }
+                    ModEntry.Instance.Monitor.Log("Using LEFT 6x6 grid", LogLevel.Info);
+                    break;
+            }
+
+            return tiles;
+        }
+        private Vector2 GetFacingDirection(Farmer who)
+        {
+            // Convert Stardew Valley's facing direction to a Vector2
+            return who.FacingDirection switch
+            {
+                0 => new Vector2(0, -1), // Up
+                1 => new Vector2(1, 0),  // Right  
+                2 => new Vector2(0, 1),  // Down
+                3 => new Vector2(-1, 0), // Left
+                _ => new Vector2(0, 1)   // Default to down
+            };
+        }
+
+        // Also update the GetFacingDirectionName method to use the same logic
+        private string DirectionName(int direction) => direction switch
+        {
+            0 => "Up",
+            1 => "Right",
+            2 => "Down",
+            3 => "Left",
+            _ => "Unknown"
+        };
         private void SpawnBubble(Vector2 tile)
         {
             var bubble = new Bubble(tile);
             bubbles.Add(bubble);
         }
 
-        private void StartSpellEffects(Farmer who, SpellbookTier tier, int bubbleCount)
+        private void StartSpellEffects(Farmer who, SpellbookTier tier, int bubbleCount, int facingDirection)
         {
             bubbleTimer = currentSpellDuration;
 
-            var tiles = PickBubbleTiles(who, bubbleCount);
+            var tiles = PickBubbleTiles(who, bubbleCount, facingDirection);
             foreach (var tile in tiles)
                 SpawnBubble(tile);
 
@@ -258,18 +438,11 @@ namespace NemosMagicMod.Spells
 
                 foreach (var b in bubbles)
                 {
-                    if (!b.Active)
-                    {
-                        b.StartDelay -= dt;
-                        if (b.StartDelay <= 0f)
-                            b.Active = true;
-                        else
-                            continue;
-                    }
-
+                    // Move bubbles
                     b.PixelPos.Y -= b.RiseSpeed * dt;
                     b.PixelPos.X += b.DriftSpeed * dt;
 
+                    // Bounce horizontally within a tile
                     float maxOffset = Game1.tileSize / 2f;
                     if (b.PixelPos.X > b.Tile.X * Game1.tileSize + maxOffset ||
                         b.PixelPos.X < b.Tile.X * Game1.tileSize - maxOffset)
@@ -277,10 +450,12 @@ namespace NemosMagicMod.Spells
                         b.DriftSpeed = -b.DriftSpeed;
                     }
 
+                    // Fade out
                     b.Opacity -= BubbleFadeSpeed * dt;
 
+                    // Respawn when fully faded - use fresh values, don't preserve speed
                     if (b.Opacity <= 0f)
-                        b.ResetToFreshValues();
+                        b.ResetToFreshValues(keepRiseSpeed: false);
                 }
 
                 if (bubbleTimer <= 0f)
@@ -288,12 +463,10 @@ namespace NemosMagicMod.Spells
                     var currentTier = GetCurrentSpellbookTier(who);
                     Game1.addHUDMessage(new HUDMessage($"Sea Spirit faded ({currentTier} tier)", 1));
                     Unsubscribe();
+                    ApplyBuffRemoval(who);
                 }
             }
-
-            HandleFishingBiteRate();
         }
-
         private void SubscribeDraw()
         {
             if (!subscribedDraw)
@@ -319,8 +492,6 @@ namespace NemosMagicMod.Spells
 
             foreach (var b in bubbles)
             {
-                if (!b.Active) continue;
-
                 e.SpriteBatch.Draw(
                     bubbleTexture,
                     Game1.GlobalToLocal(Game1.viewport, b.PixelPos),
@@ -335,52 +506,87 @@ namespace NemosMagicMod.Spells
             }
         }
 
-        private void ApplyHarmonyPatches()
-        {
-            var harmony = new Harmony("nemo.SeaSpiritFishingPatch");
-            harmony.Patch(
-                original: AccessTools.Method(typeof(FishingRod), nameof(FishingRod.DoFunction)),
-                postfix: new HarmonyMethod(typeof(SeaSpirit), nameof(FishingRod_DoFunction_Postfix))
-            );
-        }
+        private static bool harmonyPatchesApplied = false;
+        private static readonly object harmonyLock = new object();
 
-        public static void FishingRod_DoFunction_Postfix(FishingRod __instance, GameLocation location, int x, int y, int power, Farmer who)
+        private static void ApplyHarmonyPatchesOnce()
         {
-            var seaSpirit = (SeaSpirit)SpellRegistry.SeaSpirit;
-
-            if (seaSpirit.IsActive && __instance.isFishing && __instance.timeUntilFishingBite > 0)
+            lock (harmonyLock)
             {
-                Vector2 fishingTile = new Vector2(x / Game1.tileSize, y / Game1.tileSize);
-                bool nearBubble = false;
-
-                foreach (var b in seaSpirit.Bubbles)
+                if (!harmonyPatchesApplied)
                 {
-                    if (!b.Active) continue;
-                    if (Vector2.Distance(fishingTile, b.Tile) <= 1f)
-                    {
-                        nearBubble = true;
-                        break;
-                    }
-                }
+                    var harmony = new Harmony("nemo.SeaSpiritFishingPatch");
 
-                if (nearBubble)
-                {
-                    int original = (int)__instance.timeUntilFishingBite;
-                    int boosted = Math.Max(500, original / 3);
-                    __instance.timeUntilFishingBite = boosted;
-
-                    ModEntry.Instance.Monitor.Log(
-                        $"Sea Spirit applied! Original timer: {original}, boosted timer: {boosted}",
-                        LogLevel.Debug
+                    // Patch for bite speed boost
+                    harmony.Patch(
+                        original: AccessTools.Method(typeof(FishingRod), nameof(FishingRod.DoFunction)),
+                        postfix: new HarmonyMethod(typeof(SeaSpirit), nameof(FishingRod_DoFunction_Postfix))
                     );
+
+                    // Patch for rare fish / luck near bubbles
+                    harmony.Patch(
+                        original: AccessTools.Method(typeof(FishingRod), nameof(FishingRod.pullFishFromWater)),
+                        prefix: new HarmonyMethod(typeof(SeaSpirit), nameof(PullFishFromWater_Postfix))
+                    );
+
+                    harmonyPatchesApplied = true;
+                    ModEntry.Instance.Monitor.Log("SeaSpirit Harmony patches applied", LogLevel.Debug);
                 }
             }
         }
 
-        private void HandleFishingBiteRate()
+
+        // In SeaSpirit class:
+        private static readonly List<Vector2> RecentBubbleBites = new();
+
+        public static void FishingRod_DoFunction_Postfix(FishingRod __instance, GameLocation location, int x, int y, int power, Farmer who)
         {
-            // Optional: any additional per-frame fishing logic can go here
+            var seaSpirit = ModEntry.ActiveSpells.OfType<SeaSpirit>().FirstOrDefault();
+            if (seaSpirit == null || !seaSpirit.IsActive || !__instance.isFishing || __instance.timeUntilFishingBite <= 0)
+                return;
+
+            Vector2 fishingTile = new Vector2(x / Game1.tileSize, y / Game1.tileSize);
+            bool nearBubble = seaSpirit.Bubbles.Any(b => Vector2.Distance(fishingTile, b.Tile) <= 1f);
+
+            if (nearBubble)
+            {
+                float original = __instance.timeUntilFishingBite; // keep as float
+                int boosted = Math.Max(500, (int)(original / 3f)); // cast to int
+                __instance.timeUntilFishingBite = boosted;
+
+                // Store the tile for later luck check
+                RecentBubbleBites.Add(fishingTile);
+
+                ModEntry.Instance.Monitor.Log($"Sea Spirit applied! Original timer: {original}, boosted timer: {boosted}", LogLevel.Debug);
+            }
+
         }
+
+        public static void PullFishFromWater_Postfix(FishingRod __instance, ref int fishQuality)
+        {
+            if (!(__instance.lastUser is Farmer who))
+                return;
+
+            var seaSpirit = ModEntry.ActiveSpells.OfType<SeaSpirit>().FirstOrDefault();
+            if (seaSpirit == null || !seaSpirit.IsActive)
+                return;
+
+            // Use the bobber tile if possible
+            Vector2 fishingTile = new Vector2(
+                (int)(__instance.bobber.X / Game1.tileSize),
+                (int)(__instance.bobber.Y / Game1.tileSize)
+            );
+            bool nearBubble = seaSpirit.Bubbles.Any(b => Vector2.Distance(fishingTile, b.Tile) <= 1f);
+
+            if (nearBubble && seaSpirit.GetCurrentSpellbookTier(who) == SpellbookTier.Master)
+            {
+                if (fishQuality < 4)
+                    fishQuality++;
+
+                ModEntry.Instance.Monitor.Log($"Sea Spirit luck boost applied: fish quality upgraded to {fishQuality}", LogLevel.Debug);
+            }
+        }
+
     }
 
     public static class LocationExtensions
@@ -393,5 +599,10 @@ namespace NemosMagicMod.Spells
 
             return loc.doesTileHaveProperty((int)tile.X, (int)tile.Y, "Water", "Back") != null;
         }
+
     }
 }
+    
+
+
+

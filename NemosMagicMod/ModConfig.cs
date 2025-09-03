@@ -1,4 +1,5 @@
 ﻿using NemosMagicMod;
+using NemosMagicMod.Spells;
 using StardewModdingAPI;
 using StardewValley;
 
@@ -9,10 +10,10 @@ public class ModConfig
     public int ManaBarX { get; set; } = 1120;
     public int ManaBarY { get; set; } = 500;
     public bool godMode { get; set; } = false;
-
-    // Magic level override
     public bool OverrideMagicLevel { get; set; } = false;
     public int MagicLevel { get; set; } = 0;
+    public bool GiveMasterSpellbook { get; set; } = false;
+
 
     public void RegisterGMCM(IModHelper helper, SpaceShared.APIs.IGenericModConfigMenuApi gmcm, IManifest manifest)
     {
@@ -32,9 +33,17 @@ public class ModConfig
             {
                 helper.WriteConfig(this);
 
-                if (OverrideMagicLevel)
-                    ApplyMagicLevelChange();
-            }
+                 if (OverrideMagicLevel)
+                        ApplyMagicLevelChange();
+
+                 if (GiveMasterSpellbook)
+                    {
+                     TryGiveMasterSpellbook();
+                     GiveMasterSpellbook = false; // reset so it doesn’t keep spawning
+                        helper.WriteConfig(this);
+                    }
+}
+
         );
 
         // Spell selection menu key
@@ -105,6 +114,16 @@ public class ModConfig
             min: 0,
             max: 10
         );
+
+        // Give Master Spellbook
+        gmcm.AddBoolOption(
+            mod: manifest,
+            name: () => "Give Master Spellbook",
+            tooltip: () => "If enabled, a Master tier spellbook will be added to your inventory when you save the config.",
+            getValue: () => GiveMasterSpellbook,
+            setValue: val => GiveMasterSpellbook = val
+        );
+
     }
 
     private static readonly int[] MagicXpPerLevel =
@@ -153,4 +172,38 @@ public class ModConfig
             NemosMagicMod.ModEntry.Instance?.Monitor?.Log($"Error applying magic level change: {ex.Message}", LogLevel.Error);
         }
     }
+
+    private void TryGiveMasterSpellbook()
+    {
+        if (!Context.IsWorldReady || Game1.player is null)
+            return;
+
+        try
+        {
+            Farmer player = Game1.player;
+
+            // Remove all existing spellbooks
+            for (int i = player.Items.Count - 1; i >= 0; i--)
+            {
+                if (player.Items[i] is Spellbook)
+                    player.removeItemFromInventory(player.Items[i]);
+            }
+
+            // Create new Master Spellbook
+            Spellbook masterBook = new Spellbook { Tier = SpellbookTier.Master };
+
+            if (!player.addItemToInventoryBool(masterBook))
+            {
+                Game1.createItemDebris(masterBook, player.getStandingPosition(), 0);
+            }
+
+            Game1.addHUDMessage(new HUDMessage("You received a Master Spellbook!", HUDMessage.newQuest_type));
+            NemosMagicMod.ModEntry.Instance?.Monitor?.Log("Replaced all spellbooks with a Master Spellbook via config option.", LogLevel.Info);
+        }
+        catch (System.Exception ex)
+        {
+            NemosMagicMod.ModEntry.Instance?.Monitor?.Log($"Error giving Master Spellbook: {ex.Message}", LogLevel.Error);
+        }
+    }
+
 }

@@ -54,6 +54,13 @@ public static class SpellRegistry // List of all spells
         _activeSpells.Add(spell);
         ModEntry.Instance?.Monitor?.Log($"Registered active spell: {spell.Name}", LogLevel.Trace);
     }
+    public static void UnregisterActiveSpell(Spell spell)
+    {
+        if (_activeSpells.Remove(spell))
+        {
+            ModEntry.Instance?.Monitor?.Log($"Unregistered active spell: {spell.Name}", LogLevel.Trace);
+        }
+    }
 
     /// <summary>
     /// Updates all active spells and removes inactive ones
