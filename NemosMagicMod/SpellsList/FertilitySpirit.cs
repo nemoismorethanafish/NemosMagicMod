@@ -43,8 +43,6 @@ namespace NemosMagicMod.Spells
             if (!CanCast(who))
                 return;
 
-            base.Cast(who);
-
             // --- Generate unique day ID ---
             int todayId = Game1.year * 1000 + Game1.currentSeason.GetHashCode() * 100 + Game1.dayOfMonth;
 
@@ -67,13 +65,6 @@ namespace NemosMagicMod.Spells
                 return;
             }
 
-            // --- Not Enough Mana check ---
-            if (who.Stamina < this.ManaCost)
-            {
-                Game1.showRedMessage("Not enough mana!");
-                return;
-            }
-
             // --- Record usage ---
             if (!normalUsedToday)
             {
@@ -84,15 +75,22 @@ namespace NemosMagicMod.Spells
                 who.modData[$"{LastCastKey}.BonusDailyUsed"] = todayId.ToString(); // spend bonus cast
             }
 
+            base.Cast(who);
+
+
             // --- Delayed custom effects ---
             DelayedAction.functionAfterDelay(() =>
             {
                 Vector2 playerTile = new Vector2((int)(who.Position.X / Game1.tileSize), (int)(who.Position.Y / Game1.tileSize));
                 GameLocation location = who.currentLocation;
 
-                for (int x = -GrowthRadius; x <= GrowthRadius; x++)
+                // inside Cast, in the delayed effect:
+                SpellbookTier currentTier = GetCurrentSpellbookTier(who);
+                int radius = currentTier == SpellbookTier.Master ? GrowthRadius : 0;
+
+                for (int x = -radius; x <= radius; x++)
                 {
-                    for (int y = -GrowthRadius; y <= GrowthRadius; y++)
+                    for (int y = -radius; y <= radius; y++)
                     {
                         Vector2 tile = playerTile + new Vector2(x, y);
 
@@ -119,6 +117,7 @@ namespace NemosMagicMod.Spells
                         }
                     }
                 }
+
 
                 Game1.playSound("yoba");
             }, 1000); // 1-second delay
