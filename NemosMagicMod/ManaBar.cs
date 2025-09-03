@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using NemosMagicMod;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
 using System;
@@ -13,11 +14,14 @@ internal class ManaBar
     private readonly Func<int> getMaxMana;
     private readonly IModHelper helper;
 
+    private Texture2D manaBarTexture;
+    private Texture2D manaBarFullTexture;
+
     public int X { get; set; }
     public int Y { get; set; }
 
-    private readonly int width = 25;
-    private readonly int height = 200;
+    private int width;
+    private int height;
 
     private bool isDragging = false;
     private Point dragOffset;
@@ -29,43 +33,57 @@ internal class ManaBar
         this.getMaxMana = getMaxMana;
         this.helper = helper;
 
-        var config = helper.ReadConfig<ModConfig>();
-        X = config.ManaBarX;
-        Y = config.ManaBarY;
+        // Load textures
+        manaBarTexture = helper.ModContent.Load<Texture2D>("assets/ManaBar.png");
+        manaBarFullTexture = helper.ModContent.Load<Texture2D>("assets/ManaBarFull.png");
 
+        // Scale up by 20%
+        width = (int)(manaBarTexture.Width * 1f);
+        height = (int)(manaBarTexture.Height * 1f);
+
+        LoadPosition();
         previousMouseState = Mouse.GetState();
     }
 
-    public void DrawManaBar(SpriteBatch spriteBatch)
+    public void DrawManaBar(SpriteBatch spriteBatch, bool drawTooltip = true)
     {
+        if (manaBarTexture == null)
+            return;
+
+        // Current mana percentage
         float percent = (float)getCurrentMana() / getMaxMana();
 
-        // Outer border
-        IClickableMenu.drawTextureBox(
-            spriteBatch,
-            Game1.menuTexture,
-            new Rectangle(0, 256, 60, 60),
-            X - 8, Y - 8, width + 16, height + 16,
-            Color.White);
+        // Fill scaling (makes bar fill slower)
+        float fillScale = 0.82f;
+        percent *= fillScale;
+        percent = MathHelper.Clamp(percent, 0f, 1f);
 
-        // Background
-        IClickableMenu.drawTextureBox(
-            spriteBatch,
-            Game1.menuTexture,
-            new Rectangle(0, 256, 60, 60),
-            X, Y, width, height,
-            Color.Black * 0.5f);
-
-        // Fill
-        int fillHeight = (int)((height - 8) * percent);
-        int fillY = Y + (height - 4) - fillHeight;
-
+        // Draw empty background
         spriteBatch.Draw(
-            Game1.staminaRect,
-            new Rectangle(X + 4, fillY, width - 8, fillHeight),
-            Color.Blue);
+            manaBarTexture,
+            new Rectangle(X, Y, width, height),
+            Color.White
+        );
 
-        DrawTooltip(spriteBatch);
+        // Draw full bar slice
+        if (manaBarFullTexture != null && percent > 0f)
+        {
+            int fillHeight = (int)(height * percent);
+
+            Rectangle sourceRect = new Rectangle(0, manaBarFullTexture.Height - (int)(manaBarFullTexture.Height * percent),
+                                                 manaBarFullTexture.Width, (int)(manaBarFullTexture.Height * percent));
+            Rectangle destRect = new Rectangle(X, Y + height - fillHeight, width, fillHeight);
+
+            spriteBatch.Draw(
+                manaBarFullTexture,
+                destRect,
+                sourceRect,
+                Color.White
+            );
+        }
+
+        if (drawTooltip)
+            DrawTooltip(spriteBatch);
     }
 
     public void DrawTooltip(SpriteBatch spriteBatch)
@@ -112,12 +130,19 @@ internal class ManaBar
     private void SavePosition()
     {
         var config = helper.ReadConfig<ModConfig>();
-        config.ManaBarX = X;
-        config.ManaBarY = Y;
+        config.ManaBarX = (float)X / Game1.viewport.Width;
+        config.ManaBarY = (float)Y / Game1.viewport.Height;
         helper.WriteConfig(config);
     }
 
-    public void OnRenderingHud(object? sender, StardewModdingAPI.Events.RenderingHudEventArgs e)
+    private void LoadPosition()
+    {
+        var config = helper.ReadConfig<ModConfig>();
+        X = (int)(config.ManaBarX * Game1.viewport.Width);
+        Y = (int)(config.ManaBarY * Game1.viewport.Height);
+    }
+
+    public void OnRenderingHud(object? sender, RenderingHudEventArgs e)
     {
         if (Game1.eventUp || Game1.isFestival())
             return;
@@ -126,18 +151,34 @@ internal class ManaBar
             return;
 
         HandleDragging();
-        DrawManaBar(Game1.spriteBatch);
+        DrawManaBar(Game1.spriteBatch, drawTooltip: false);
+    }
+
+    public void OnRenderedHud(object? sender, RenderedHudEventArgs e)
+    {
+        if (Game1.eventUp || Game1.isFestival())
+            return;
+
+        if (Game1.activeClickableMenu != null && Game1.activeClickableMenu is not GameMenu)
+            return;
+
+        if (!Game1.displayHUD)
+            return;
+
+        DrawTooltip(Game1.spriteBatch);
     }
 
     public void SubscribeToEvents()
     {
         helper.Events.Display.RenderingHud += OnRenderingHud;
+        helper.Events.Display.RenderedHud += OnRenderedHud;
         helper.Events.GameLoop.DayStarted += (_, _) => ManaManager.Refill();
+        helper.Events.Display.WindowResized += (_, _) => LoadPosition();
     }
 
     private class ModConfig
     {
-        public int ManaBarX { get; set; } = 50;
-        public int ManaBarY { get; set; } = 50;
+        public float ManaBarX { get; set; } = 0.05f;
+        public float ManaBarY { get; set; } = 0.05f;
     }
 }

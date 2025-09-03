@@ -13,6 +13,7 @@ public class ModConfig
     public bool GiveMasterSpellbook { get; set; } = false;
 
 
+
     public void RegisterGMCM(IModHelper helper, SpaceShared.APIs.IGenericModConfigMenuApi gmcm, IManifest manifest)
     {
         gmcm.Register(
