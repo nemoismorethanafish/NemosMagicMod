@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using NemosMagicMod;
 using StardewModdingAPI;
 using StardewValley;
@@ -10,6 +11,7 @@ internal class ManaBar
 {
     private readonly Func<int> getCurrentMana;
     private readonly Func<int> getMaxMana;
+    private readonly IModHelper helper;
 
     public int X { get; set; }
     public int Y { get; set; }
@@ -17,12 +19,21 @@ internal class ManaBar
     private readonly int width = 25;
     private readonly int height = 200;
 
-    public ManaBar(Func<int> getCurrentMana, Func<int> getMaxMana, int x, int y)
+    private bool isDragging = false;
+    private Point dragOffset;
+    private MouseState previousMouseState;
+
+    public ManaBar(Func<int> getCurrentMana, Func<int> getMaxMana, IModHelper helper)
     {
         this.getCurrentMana = getCurrentMana;
         this.getMaxMana = getMaxMana;
-        this.X = x;
-        this.Y = y;
+        this.helper = helper;
+
+        var config = helper.ReadConfig<ModConfig>();
+        X = config.ManaBarX;
+        Y = config.ManaBarY;
+
+        previousMouseState = Mouse.GetState();
     }
 
     public void DrawManaBar(SpriteBatch spriteBatch)
@@ -54,40 +65,79 @@ internal class ManaBar
             new Rectangle(X + 4, fillY, width - 8, fillHeight),
             Color.Blue);
 
-        // Draw tooltip on top if mouse is over
         DrawTooltip(spriteBatch);
     }
 
     public void DrawTooltip(SpriteBatch spriteBatch)
     {
-        var mouse = Game1.getMousePosition();
+        var mouse = Mouse.GetState();
         var rect = new Rectangle(X, Y, width, height);
-        if (rect.Contains(mouse))
+        if (rect.Contains(new Point(mouse.X, mouse.Y)))
         {
             string tooltip = $"Mana: {getCurrentMana()} / {getMaxMana()}";
-            // Draw on top of the bar
             IClickableMenu.drawHoverText(spriteBatch, tooltip, Game1.smallFont);
         }
     }
 
+    private void HandleDragging()
+    {
+        var mouse = Mouse.GetState();
+        var keyboard = Keyboard.GetState();
+        var mousePoint = new Point(mouse.X, mouse.Y);
+        var rect = new Rectangle(X, Y, width, height);
+
+        if (!isDragging && rect.Contains(mousePoint) &&
+            keyboard.IsKeyDown(Keys.LeftControl) &&
+            mouse.LeftButton == ButtonState.Pressed &&
+            previousMouseState.LeftButton == ButtonState.Released)
+        {
+            isDragging = true;
+            dragOffset = new Point(mouse.X - X, mouse.Y - Y);
+        }
+
+        if (isDragging && mouse.LeftButton == ButtonState.Pressed)
+        {
+            X = mouse.X - dragOffset.X;
+            Y = mouse.Y - dragOffset.Y;
+        }
+        else if (isDragging)
+        {
+            isDragging = false;
+            SavePosition();
+        }
+
+        previousMouseState = mouse;
+    }
+
+    private void SavePosition()
+    {
+        var config = helper.ReadConfig<ModConfig>();
+        config.ManaBarX = X;
+        config.ManaBarY = Y;
+        helper.WriteConfig(config);
+    }
+
     public void OnRenderingHud(object? sender, StardewModdingAPI.Events.RenderingHudEventArgs e)
     {
-        // Don’t draw if a festival, event, or special cutscene is active
         if (Game1.eventUp || Game1.isFestival())
             return;
 
-        // Optionally: don’t show if another HUD-blocking menu is open
         if (Game1.activeClickableMenu != null && Game1.activeClickableMenu is not GameMenu)
             return;
 
+        HandleDragging();
         DrawManaBar(Game1.spriteBatch);
     }
 
-
-    public void SubscribeToEvents(IModHelper helper)
+    public void SubscribeToEvents()
     {
         helper.Events.Display.RenderingHud += OnRenderingHud;
         helper.Events.GameLoop.DayStarted += (_, _) => ManaManager.Refill();
+    }
 
+    private class ModConfig
+    {
+        public int ManaBarX { get; set; } = 50;
+        public int ManaBarY { get; set; } = 50;
     }
 }

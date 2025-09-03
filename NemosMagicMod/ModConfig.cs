@@ -7,8 +7,6 @@ public class ModConfig
 {
     public SButton SpellSelectionKey { get; set; } = SButton.Q;
     public SButton HotkeyCast { get; set; } = SButton.Z;
-    public int ManaBarX { get; set; } = 1120;
-    public int ManaBarY { get; set; } = 500;
     public bool godMode { get; set; } = false;
     public bool OverrideMagicLevel { get; set; } = false;
     public int MagicLevel { get; set; } = 0;
@@ -23,8 +21,6 @@ public class ModConfig
             {
                 SpellSelectionKey = SButton.D9;
                 HotkeyCast = SButton.Z;
-                ManaBarX = 1120;
-                ManaBarY = 500;
                 godMode = false;
                 OverrideMagicLevel = false;
                 MagicLevel = 0;
@@ -62,28 +58,6 @@ public class ModConfig
             tooltip: () => "The key to instantly cast your hotkeyed spell.",
             getValue: () => HotkeyCast,
             setValue: val => HotkeyCast = val
-        );
-
-        // Mana bar X
-        gmcm.AddNumberOption(
-            mod: manifest,
-            name: () => "Mana Bar X",
-            tooltip: () => "Horizontal position of the mana bar.",
-            getValue: () => ManaBarX,
-            setValue: val => ManaBarX = val,
-            min: 0,
-            max: Game1.uiViewport.Width
-        );
-
-        // Mana bar Y
-        gmcm.AddNumberOption(
-            mod: manifest,
-            name: () => "Mana Bar Y",
-            tooltip: () => "Vertical position of the mana bar.",
-            getValue: () => ManaBarY,
-            setValue: val => ManaBarY = val,
-            min: 0,
-            max: Game1.uiViewport.Height
         );
 
         // God mode

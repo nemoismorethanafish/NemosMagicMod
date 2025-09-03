@@ -49,10 +49,10 @@ namespace NemosMagicMod
             manaBar = new ManaBar(
                 () => ManaManager.CurrentMana,
                 () => ManaManager.MaxMana,
-                10,
-                10
+                helper // pass the IModHelper so ManaBar can read/write its config
             );
-            manaBar.SubscribeToEvents(helper);
+
+            manaBar.SubscribeToEvents();
             Spellbook.LoadIcon(helper);
             MagicSkillIcon = Helper.ModContent.Load<Texture2D>("assets/magic-icon-smol.png");
 
